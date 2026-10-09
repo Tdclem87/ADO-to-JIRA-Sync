@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 from azure.devops.connection import Connection
@@ -115,8 +115,14 @@ class AttachmentLinkParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
-        if tag == "img" and attributes.get("src"):
-            self.urls[attributes["src"]] = "screenshot.png"
+        if tag == "img":
+            image_url = (
+                attributes.get("src")
+                or attributes.get("data-src")
+                or attributes.get("data-original")
+            )
+            if image_url:
+                self.urls[image_url] = attributes.get("alt") or "screenshot.png"
         elif tag == "a" and attributes.get("href"):
             self.urls.setdefault(attributes["href"], None)
 
@@ -128,16 +134,29 @@ def remove_html_formatting(comment_text):
     return parser.plain_text()
 
 
-def get_comment_attachment_urls(comment_text):
+def get_comment_attachment_urls(comment_text, organization_url):
+    comment_text = comment_text or ""
     parser = AttachmentLinkParser()
-    parser.feed(comment_text or "")
+    parser.feed(comment_text)
     parser.close()
-    return [
-        {"url": url, "name": name}
-        for url, name in parser.urls.items()
-        if urlparse(url).scheme in {"http", "https"}
-        and "/attachments/" in urlparse(url).path.lower()
-    ]
+    for match in re.finditer(r"!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)", comment_text):
+        url = match.group(2).strip("<>")
+        parser.urls.setdefault(url, match.group(1) or "screenshot.png")
+
+    attachments = []
+    for url, name in parser.urls.items():
+        parsed_url = urlparse(url)
+        if parsed_url.scheme and parsed_url.scheme not in {"http", "https"}:
+            continue
+        if "/attachments/" not in parsed_url.path.lower():
+            continue
+        if not parsed_url.scheme and not parsed_url.netloc:
+            url = urljoin(organization_url.rstrip("/") + "/", url.lstrip("/"))
+        elif not parsed_url.scheme:
+            url = urljoin(organization_url, url)
+        if urlparse(url).scheme in {"http", "https"}:
+            attachments.append({"url": url, "name": name})
+    return attachments
 
 
 def get_attachment_filename(attachment):
@@ -643,6 +662,65 @@ def add_jira_comment(
     return response.json()
 
 
+def add_jira_comment_attachments(
+    issue_key, jira_comment, attachment_links, jira_api_token
+):
+    body = jira_comment.get("body", {})
+    if not isinstance(body, dict):
+        return False
+
+    existing_text = get_jira_comment_text(body)
+    missing_attachments = [
+        attachment
+        for attachment in attachment_links
+        if attachment["filename"] not in existing_text
+    ]
+    if not missing_attachments:
+        return False
+
+    updated_body = dict(body)
+    content = list(body.get("content", []))
+    if "Attachments:" not in existing_text:
+        content.append(
+            {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "Attachments:"}],
+            }
+        )
+    for attachment in missing_attachments:
+        content.append(
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": attachment["filename"],
+                        "marks": [
+                            {
+                                "type": "link",
+                                "attrs": {"href": attachment["url"]},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    updated_body["content"] = content
+
+    response = SESSION.put(
+        f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/comment/{jira_comment['id']}",
+        auth=(JIRA_EMAIL, jira_api_token),
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json={"body": updated_body},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return True
+
+
 def jira_body_contains_marker(body, marker):
     if isinstance(body, dict):
         return any(
@@ -829,8 +907,17 @@ def main():
     unique_attachments = {
         attachment["url"]: attachment for attachment in attachments
     }
+    organization_urls_by_prefix = {
+        work_item["prefix"]: work_item["organization_url"]
+        for work_item in work_items
+    }
+    comment_attachment_count = 0
     for comment in comments:
-        for comment_attachment in get_comment_attachment_urls(comment["CommentText"]):
+        comment_attachments = get_comment_attachment_urls(
+            comment["CommentText"], organization_urls_by_prefix[comment["ADO"]]
+        )
+        comment_attachment_count += len(comment_attachments)
+        for comment_attachment in comment_attachments:
             url = comment_attachment["url"]
             unique_attachments.setdefault(
                 url,
@@ -846,6 +933,10 @@ def main():
                     ),
                 },
             )
+    LOGGER.info(
+        "Found %d attachment URL(s) embedded in ADO comments.",
+        comment_attachment_count,
+    )
 
     LOGGER.info(
         "Found %d ADO comments.",
@@ -882,6 +973,11 @@ def main():
         return
 
     uploaded_by_url = {}
+    uploaded_by_filename = {
+        attachment["filename"]: attachment
+        for attachment in jira_attachments
+        if attachment.get("filename")
+    }
     fallback_links = {}
     for attachment in unique_attachments.values():
         try:
@@ -896,10 +992,20 @@ def main():
             if fallback_link:
                 fallback_links[fallback_link["url"]] = fallback_link
             if uploaded_attachment:
+                uploaded_by_filename[uploaded_attachment["filename"]] = uploaded_attachment
                 uploaded_by_url[attachment["url"]] = {
                     "filename": uploaded_attachment["filename"],
                     "url": uploaded_attachment["content"],
                 }
+            else:
+                existing_attachment = uploaded_by_filename.get(
+                    get_attachment_filename(attachment)
+                )
+                if existing_attachment:
+                    uploaded_by_url[attachment["url"]] = {
+                        "filename": existing_attachment["filename"],
+                        "url": existing_attachment["content"],
+                    }
         except (requests.RequestException, KeyError) as error:
             LOGGER.error("Attachment upload failed for %s: %s", attachment["name"], error)
             failures.append(f"Attachment {attachment['name']}: {error}")
@@ -911,27 +1017,54 @@ def main():
             f"Comment Created by: {comment['CommentCreatedBy']}\n"
             f"Date Created: {format_ado_timestamp(comment['CommentCreatedDate'])}"
         )
-        if (
-            comment_header + comment["PlainText"]
-            in existing_comment_text
-        ):
-            skipped_count += 1
-            continue
-
         attachment_links = [
             uploaded_by_url[comment_attachment["url"]]
             for comment_attachment in get_comment_attachment_urls(
-                comment["CommentText"]
+                comment["CommentText"], organization_urls_by_prefix[comment["ADO"]]
             )
             if comment_attachment["url"] in uploaded_by_url
         ]
         attachment_links.extend(
             fallback_links[comment_attachment["url"]]
             for comment_attachment in get_comment_attachment_urls(
-                comment["CommentText"]
+                comment["CommentText"], organization_urls_by_prefix[comment["ADO"]]
             )
             if comment_attachment["url"] in fallback_links
         )
+        existing_jira_comment = next(
+            (
+                jira_comment
+                for jira_comment in jira_comments
+                if comment_header + comment["PlainText"]
+                in get_jira_comment_text(jira_comment.get("body", {}))
+            ),
+            None,
+        )
+        if existing_jira_comment:
+            skipped_count += 1
+            if attachment_links:
+                try:
+                    if add_jira_comment_attachments(
+                        jira_issue_key,
+                        existing_jira_comment,
+                        attachment_links,
+                        jira_api_token,
+                    ):
+                        LOGGER.info(
+                            "Added missing attachment link(s) to existing Jira comment %s.",
+                            existing_jira_comment["id"],
+                        )
+                except requests.RequestException as error:
+                    LOGGER.error(
+                        "Could not update attachments on Jira comment %s: %s",
+                        existing_jira_comment.get("id", "unknown ID"),
+                        error,
+                    )
+                    failures.append(
+                        f"Comment attachments for {comment['CommentCreatedBy']}: {error}"
+                    )
+            continue
+
         try:
             add_jira_comment(
                 jira_issue_key,
