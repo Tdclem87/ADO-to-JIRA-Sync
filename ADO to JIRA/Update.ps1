@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
 if (-not $gitCommand) {
     throw "Git is required to update this checkout. Install Git for Windows and try again."
@@ -35,18 +35,21 @@ $currentCommit = (& $gitPath -C $repoRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) {
     throw "Could not identify the updated commit."
 }
-if ($currentCommit -eq $previousCommit) {
-    Write-Host "The app is already up to date."
-    exit 0
+$requirementsPath = Join-Path $PSScriptRoot "requirements.txt"
+$requirementsHash = (Get-FileHash -Path $requirementsPath -Algorithm SHA256).Hash
+$dependencyMarkerPath = (& $gitPath -C $repoRoot rev-parse --git-path ado-to-jira-dependencies.sha256).Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not locate the Git metadata directory for the dependency marker."
+}
+if (-not [System.IO.Path]::IsPathRooted($dependencyMarkerPath)) {
+    $dependencyMarkerPath = Join-Path $repoRoot $dependencyMarkerPath
 }
 
-$requirementsFile = "ADO to JIRA/requirements.txt"
-& $gitPath -C $repoRoot diff --quiet $previousCommit $currentCommit -- $requirementsFile
-$requirementsDiffExitCode = $LASTEXITCODE
-if ($requirementsDiffExitCode -gt 1) {
-    throw "Could not check whether Python dependencies changed."
+$installedRequirementsHash = $null
+if (Test-Path $dependencyMarkerPath) {
+    $installedRequirementsHash = (Get-Content -Path $dependencyMarkerPath -Raw).Trim()
 }
-if ($requirementsDiffExitCode -eq 1) {
+if ($installedRequirementsHash -ne $requirementsHash) {
     $pythonPath = Join-Path $repoRoot ".venv\Scripts\python.exe"
     if (-not (Test-Path $pythonPath)) {
         $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
@@ -56,11 +59,18 @@ if ($requirementsDiffExitCode -eq 1) {
         $pythonPath = $pythonCommand.Source
     }
 
-    Write-Host "Dependencies changed; updating Python packages..."
-    & $pythonPath -m pip install -r (Join-Path $PSScriptRoot "requirements.txt")
+    Write-Host "Installing or refreshing Python dependencies..."
+    & $pythonPath -m pip install -r $requirementsPath
     if ($LASTEXITCODE -ne 0) {
-        throw "Dependency update failed. Resolve the pip error and run Update.cmd again."
+        throw "Dependency update failed. Resolve the pip error; the launcher will retry on its next start."
     }
+
+    [System.IO.File]::WriteAllText($dependencyMarkerPath, $requirementsHash)
+}
+
+if ($currentCommit -eq $previousCommit) {
+    Write-Host "The app is already up to date."
+    return
 }
 
 Write-Host "App updated successfully."

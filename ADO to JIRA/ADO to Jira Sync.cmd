@@ -8,8 +8,9 @@ if %errorlevel% equ 0 (
 	exit /b %errorlevel%
 )
 
+echo PowerShell is unavailable; automatic update check skipped.
 set "SCRIPT=clean_ado_to_jira_sync.py"
-set "PYTHON=%~dp0..\..\.venv\Scripts\python.exe"
+set "PYTHON=%~dp0..\.venv\Scripts\python.exe"
 if not exist "%PYTHON%" set "PYTHON=python"
 
 :restart

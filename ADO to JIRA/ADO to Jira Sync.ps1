@@ -1,7 +1,15 @@
 $scriptName = "clean_ado_to_jira_sync.py"
 
 Set-Location $PSScriptRoot
-$pythonPath = Join-Path $PSScriptRoot "..\..\.venv\Scripts\python.exe"
+$updaterPath = Join-Path $PSScriptRoot "Update.ps1"
+try {
+    & $updaterPath
+} catch {
+    Write-Warning "Automatic update check failed: $($_.Exception.Message)"
+    Write-Warning "Continuing with the currently available version."
+}
+
+$pythonPath = Join-Path $PSScriptRoot "..\.venv\Scripts\python.exe"
 if (-not (Test-Path $pythonPath)) {
     $pythonPath = "python"
 }

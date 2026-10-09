@@ -166,9 +166,11 @@ python clean_ado_to_jira_sync.py
 
 ### Use the automatic Windows launcher
 
-Double-click `ADO to Jira Sync.cmd` to launch the application. The launcher prefers Windows PowerShell and falls back to a Command Prompt loop if PowerShell is unavailable. It:
+Double-click `ADO to Jira Sync.cmd` to launch the application. The launcher checks for updates automatically before the first sync run when Windows PowerShell is available, and falls back to a Command Prompt loop if it is not. The fallback displays that it skipped the update check. It:
 
 - uses `powershell.exe` when it is available
+- fast-forwards the current Git branch when updates are available and tracked files have no local edits
+- refreshes Python dependencies only when `requirements.txt` changes or a previous dependency install did not complete
 - prefers the repository virtual environment at `.venv\Scripts\python.exe` when available
 - uses the shared `clean_ado_to_jira_sync.py` script
 - keeps the console open after each run
@@ -211,8 +213,8 @@ The script also keeps a local `run_state.json` file with the latest session stat
 
 ## Updating the app
 
-Clone the repository once, then run `ADO to JIRA/Update.cmd` whenever you want the latest version. The updater fetches the latest commit for the current branch and fast-forwards only; it refuses to proceed if tracked files have local edits. It does not reset or stash files. Keep personal configuration in the ignored `config.json` and credentials in Windows environment variables.
+The normal launcher checks for updates automatically at startup. You can also run `ADO to JIRA/Update.cmd` to check manually. The updater fetches the latest commit for the current branch and fast-forwards only; it refuses to proceed if tracked files have local edits. It does not reset or stash files. Keep personal configuration in the ignored `config.json` and credentials in Windows environment variables.
 
-The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. If an update changes `requirements.txt`, the updater refreshes dependencies in the repository `.venv` when present, or uses the available Python installation otherwise. Git and Python must be installed on the computer.
+The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. When `requirements.txt` changes, the updater refreshes dependencies in the repository `.venv` when present, or uses the available Python installation otherwise. A failed dependency install is retried on the next launcher start. Git and Python must be installed on the computer; if the update check fails, the launcher warns and continues with the current files.
 
 The updater does not replace ignored configuration, logs, run state, or generated CSV files. Local edits to tracked source files must be committed or otherwise resolved before updating.
