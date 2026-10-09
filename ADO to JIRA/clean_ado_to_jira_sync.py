@@ -584,6 +584,10 @@ def get_work_item_field_update(organization_url, work_item_id, revision, pat):
             or change["oldValue"] == change["newValue"]
         ):
             continue
+        old_display_value = format_ado_field_value(change["oldValue"])
+        new_display_value = format_ado_field_value(change["newValue"])
+        if old_display_value == new_display_value:
+            continue
         changed_fields[field_name] = {
             "old_value": change["oldValue"],
             "new_value": change["newValue"],
@@ -621,6 +625,11 @@ def format_ado_field_value(value):
         )
     elif isinstance(value, list):
         text = ", ".join(format_ado_field_value(item) for item in value)
+    elif isinstance(value, str):
+        text = remove_html_formatting(value)
+        text = "\n".join(
+            line.strip() for line in text.splitlines() if line.strip()
+        )
     else:
         text = str(value)
 
