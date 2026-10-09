@@ -271,16 +271,103 @@ def view_readme():
     input("Press Enter to continue...")
 
 
+def read_jira_issue_key_or_function_key(prompt):
+    if os.name != "nt":
+        return input(prompt).strip()
+
+    import msvcrt
+
+    print(prompt, end="", flush=True)
+    characters = []
+    while True:
+        character = msvcrt.getwch()
+        if character in {"\x00", "\xe0"}:
+            scan_code = ord(msvcrt.getwch())
+            if scan_code == 59:
+                print()
+                return "F1"
+            if scan_code == 60:
+                print()
+                return "F2"
+            continue
+        if character in {"\r", "\n"}:
+            print()
+            return "".join(characters).strip()
+        if character == "\x03":
+            raise KeyboardInterrupt
+        if character == "\b":
+            if characters:
+                characters.pop()
+                print("\b \b", end="", flush=True)
+            continue
+        if character.isprintable():
+            characters.append(character)
+            print(character, end="", flush=True)
+
+
+def add_organization_configuration():
+    print("\nAdd an Azure DevOps organization for Jira issue matching.")
+    print("The Jira project-key prefix maps Jira issues to this Azure DevOps organization.")
+    while True:
+        prefix = get_required_input(
+            "Jira project-key prefix (for example NEWORG): "
+        ).upper()
+        if not re.fullmatch(r"[A-Z][A-Z0-9]*", prefix):
+            print("Use letters and numbers, starting with a letter.")
+            continue
+        if any(existing.upper() == prefix for existing in ADO_CONFIGS):
+            print(f"The prefix {prefix} is already configured.")
+            continue
+        break
+
+    while True:
+        organization_url = get_required_input(
+            "Azure DevOps organization URL (for example https://dev.azure.com/your-org): "
+        ).rstrip("/")
+        parsed_url = urlparse(organization_url)
+        if parsed_url.scheme in {"http", "https"} and parsed_url.netloc:
+            break
+        print("Enter a valid URL beginning with http:// or https://.")
+
+    configuration = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    ado_configs = configuration.setdefault("ado_configs", {})
+    if any(existing.upper() == prefix for existing in ado_configs):
+        print(f"The prefix {prefix} is already configured.")
+        load_configuration()
+        return
+
+    ado_configs[prefix] = {"organization_url": organization_url}
+    temporary_path = CONFIG_PATH.with_suffix(".tmp")
+    temporary_path.write_text(
+        json.dumps(configuration, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary_path.replace(CONFIG_PATH)
+    load_configuration()
+
+    pat_variable = f"AZDO_{prefix}_PAT"
+    print(f"Organization {prefix} was added to {CONFIG_PATH}.")
+    print(f"Set its Azure DevOps PAT as the Windows environment variable {pat_variable}.")
+    if not os.environ.get(pat_variable):
+        print("Restart the launcher after setting the PAT so it can read the new variable.")
+
+
 def get_jira_issue_key():
     while True:
         valid_prefixes = " / ".join(
             sorted(prefix.upper() for prefix in ADO_CONFIGS.keys())
         )
-        value = get_required_input(
-            f"Jira issue key ({valid_prefixes}, or R to view README): "
+        value = read_jira_issue_key_or_function_key(
+            f"Jira issue key ({valid_prefixes}; F1 README; F2 add organization): "
         )
-        if value.lower() == "r":
+        if value.upper() == "F1":
             view_readme()
+            continue
+        if value.upper() == "F2":
+            add_organization_configuration()
+            continue
+        if not value:
+            print("A Jira issue key is required.")
             continue
         return value
 
@@ -459,6 +546,87 @@ def get_work_item_status(work_item, work_item_id):
         "changed_by": changed_by,
         "changed_date": fields.get("System.ChangedDate") or "Unknown",
     }
+
+
+def get_work_item_field_update(organization_url, work_item_id, revision, pat):
+    if not revision or int(revision) <= 1:
+        return None
+
+    response = SESSION.get(
+        f"{organization_url}/_apis/wit/workItems/{work_item_id}/updates/{revision}",
+        params={"api-version": "7.1"},
+        auth=("", pat),
+        timeout=30,
+    )
+    response.raise_for_status()
+    update = response.json()
+    ignored_fields = {
+        "System.AuthorizedAs",
+        "System.AuthorizedDate",
+        "System.ChangedBy",
+        "System.ChangedDate",
+        "System.CommentCount",
+        "System.History",
+        "System.PersonId",
+        "System.Rev",
+        "System.RevisedDate",
+        "System.State",
+        "System.StateChangeDate",
+        "System.Watermark",
+    }
+    changed_fields = {}
+    for field_name, change in update.get("fields", {}).items():
+        if (
+            field_name in ignored_fields
+            or not isinstance(change, dict)
+            or "oldValue" not in change
+            or "newValue" not in change
+            or change["oldValue"] == change["newValue"]
+        ):
+            continue
+        changed_fields[field_name] = {
+            "old_value": change["oldValue"],
+            "new_value": change["newValue"],
+        }
+
+    if not changed_fields:
+        return None
+
+    changed_by = update.get("revisedBy") or {}
+    if isinstance(changed_by, dict):
+        changed_by = (
+            changed_by.get("displayName")
+            or changed_by.get("uniqueName")
+            or changed_by.get("id")
+            or "Unknown"
+        )
+    return {
+        "work_item_id": work_item_id,
+        "revision": update.get("rev") or revision,
+        "changed_by": changed_by,
+        "changed_date": update.get("revisedDate") or "Unknown",
+        "fields": changed_fields,
+    }
+
+
+def format_ado_field_value(value):
+    if value is None:
+        text = "(empty)"
+    elif isinstance(value, dict):
+        text = (
+            value.get("displayName")
+            or value.get("uniqueName")
+            or value.get("name")
+            or json.dumps(value, ensure_ascii=False, sort_keys=True)
+        )
+    elif isinstance(value, list):
+        text = ", ".join(format_ado_field_value(item) for item in value)
+    else:
+        text = str(value)
+
+    if len(text) > 500:
+        return text[:497] + "..."
+    return text
 
 
 def get_work_item_attachments(organization_url, work_item_id, pat):
@@ -779,14 +947,13 @@ def main():
     LOGGER.info("Sync session started.")
     ensure_setup()
     ensure_environment_variables()
-    jira_api_token = get_required_environment_variable("JIRA_API_TOKEN")
     jira_issue_key = get_jira_issue_key()
     jira_issue_key_upper = jira_issue_key.upper()
     jira_prefix = next(
         (
             prefix
             for prefix in ADO_CONFIGS
-            if jira_issue_key_upper.startswith(prefix.upper())
+            if jira_issue_key_upper.startswith(prefix.upper() + "-")
         ),
         None,
     )
@@ -795,6 +962,17 @@ def main():
         raise ValueError(
             f"The Jira issue key must begin with one of: {valid_prefixes}."
         )
+    ensure_environment_variables()
+    required_credentials = ["JIRA_API_TOKEN", f"AZDO_{jira_prefix.upper()}_PAT"]
+    missing_credentials = [
+        name for name in required_credentials if not os.environ.get(name)
+    ]
+    if missing_credentials:
+        raise RuntimeError(
+            "Restart the launcher after setting the required environment variable(s): "
+            + ", ".join(missing_credentials)
+        )
+    jira_api_token = get_required_environment_variable("JIRA_API_TOKEN")
     LOGGER.info("Validated Jira issue key prefix.")
 
     try:
@@ -841,6 +1019,7 @@ def main():
     comments = []
     attachments = []
     work_item_statuses = []
+    work_item_field_updates = []
     failures = []
     for work_item in work_items:
         work_item_id = work_item["work_item_id"]
@@ -880,6 +1059,17 @@ def main():
                 attachment["ado"] = work_item["prefix"]
                 attachment["pat"] = work_item["pat"]
             attachments.extend(ado_attachments)
+            revision = getattr(ado_work_item, "rev", None)
+            if revision is None:
+                revision = (getattr(ado_work_item, "fields", {}) or {}).get("System.Rev")
+            field_update = get_work_item_field_update(
+                work_item["organization_url"],
+                work_item_id,
+                revision,
+                work_item["pat"],
+            )
+            if field_update:
+                work_item_field_updates.append(field_update)
         except requests.RequestException as error:
             LOGGER.error("Azure DevOps request failed for work item %s: %s", work_item_id, error)
             failures.append(f"ADO work item {work_item_id}: {error}")
@@ -951,6 +1141,11 @@ def main():
     LOGGER.info(
         "Found status information for %d work item(s).",
         len(work_item_statuses),
+        extra={"show_console": preview_first},
+    )
+    LOGGER.info(
+        "Found non-status field updates for %d work item(s).",
+        len(work_item_field_updates),
         extra={"show_console": preview_first},
     )
     LOGGER.info(
@@ -1124,6 +1319,61 @@ def main():
                 error,
             )
 
+    field_update_posted_count = 0
+    seen_field_update_markers = set()
+    for field_update in work_item_field_updates:
+        field_marker = (
+            f"[ADO_TO_JIRA_FIELDS:{field_update['work_item_id']}:"
+            f"{field_update['revision']}]"
+        )
+        if field_marker in seen_field_update_markers or any(
+            field_marker in text for text in existing_comment_text
+        ):
+            continue
+
+        field_header = (
+            f"{field_marker} ADO work item {field_update['work_item_id']} fields updated"
+        )
+        field_lines = [
+            f"{field_name}: "
+            f"{format_ado_field_value(change['old_value'])} -> "
+            f"{format_ado_field_value(change['new_value'])}"
+            for field_name, change in field_update["fields"].items()
+        ]
+        field_body = (
+            f"Revision: {field_update['revision']}\n"
+            f"Changed by: {field_update['changed_by']}\n"
+            f"Changed: {format_ado_timestamp(field_update['changed_date'])}\n\n"
+            "Updated fields:\n"
+            + "\n".join(field_lines)
+        )
+        try:
+            add_jira_comment(
+                jira_issue_key,
+                field_header,
+                field_body,
+                [],
+                jira_api_token,
+            )
+            field_update_posted_count += 1
+            seen_field_update_markers.add(field_marker)
+            existing_comment_text.add(field_marker)
+            LOGGER.info(
+                "Posted field updates for ADO work item %s revision %s.",
+                field_update["work_item_id"],
+                field_update["revision"],
+            )
+        except requests.RequestException as error:
+            failures.append(
+                f"Field updates for work item {field_update['work_item_id']}: {error}"
+            )
+            LOGGER.error(
+                "Jira field update comment failed for work item %s revision %s: %s",
+                field_update["work_item_id"],
+                field_update["revision"],
+                error,
+            )
+
     if fallback_links:
         link_header = "[ADO_TO_JIRA_LINKS] Attachments not uploaded"
         link_body = (
@@ -1150,6 +1400,7 @@ def main():
         "completed",
         posted_comments=posted_count,
         posted_status_comments=status_posted_count,
+        posted_field_update_comments=field_update_posted_count,
         skipped_duplicates=skipped_count,
         failures=len(failures),
     )

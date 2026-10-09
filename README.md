@@ -36,6 +36,7 @@ The dependency list is stored in `requirements.txt` next to the scripts.
 
 - Reads comments and attachments from Azure DevOps work items.
 - Posts each work item's current state, last changed-by identity, and last changed timestamp into a Jira status comment.
+- Posts a separate Jira comment with before-and-after values when non-status fields change in the latest Azure DevOps revision.
 - Converts HTML comment content into readable Jira text.
 - Uploads work item attachments and comment-linked screenshots to Jira.
 - Streams attachment downloads and uploads instead of loading entire files into memory.
@@ -189,7 +190,9 @@ The script asks for the Jira issue key, then reads the Jira title/summary and au
 
 Status comments use a hidden marker containing the work item ID, state, and changed timestamp. This prevents the same status version from being posted repeatedly while allowing a new Jira status comment when the ADO state changes.
 
-You can also type `R` at the Jira key prompt to view this README from the script.
+Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update, and a work-item/revision marker prevents duplicate comments. Only the latest revision is checked on each sync run.
+
+At the Jira issue-key prompt, press `F1` to display this README or `F2` to add an Azure DevOps organization. The `F2` flow asks for a Jira project-key prefix and Azure DevOps organization URL, then saves that mapping to the local `config.json` while retaining the existing Jira account settings. Add the new prefix's PAT to Windows as `AZDO_<PREFIX>_PAT` and restart the launcher so it can read the new environment variable. On non-Windows terminals, enter `F1` or `F2` as text instead of pressing the function key.
 
 The CSV export is written next to the script as `work_item_comments.csv`.
 
@@ -213,8 +216,10 @@ The script also keeps a local `run_state.json` file with the latest session stat
 
 ## Updating the app
 
-The normal launcher checks for updates automatically at startup. You can also run `ADO to JIRA/Update.cmd` to check manually. The updater fetches the latest commit for the current branch and fast-forwards only; it refuses to proceed if tracked files have local edits. It does not reset or stash files. Keep personal configuration in the ignored `config.json` and credentials in Windows environment variables.
+When you start `ADO to Jira Sync.cmd`, it checks for updates before showing the first sync prompt. The console reports whether it is checking, updated, already current, or continuing after an update error. You do not need to run the updater separately. To check manually, run `ADO to JIRA/Update.cmd`.
 
-The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. When `requirements.txt` changes, the updater refreshes dependencies in the repository `.venv` when present, or uses the available Python installation otherwise. A failed dependency install is retried on the next launcher start. Git and Python must be installed on the computer; if the update check fails, the launcher warns and continues with the current files.
+The updater uses Git to fast-forward the current branch. It will not update if tracked files have local edits, and it never resets or stashes files. Resolve or commit those edits, then start the launcher again. Ignored configuration, logs, run state, and generated CSV files are not replaced.
 
-The updater does not replace ignored configuration, logs, run state, or generated CSV files. Local edits to tracked source files must be committed or otherwise resolved before updating.
+The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. Dependencies are installed when `requirements.txt` changes or a previous install did not finish successfully. The updater uses the repository `.venv` when present, or the available Python installation otherwise; a failed install is retried at the next launcher start.
+
+Git is required for update checks. If the check fails, the launcher displays a warning and continues with the current files. If Windows PowerShell is unavailable, the Command Prompt fallback displays that it skipped the update check. Python is needed when dependencies must be installed and to run the sync.
