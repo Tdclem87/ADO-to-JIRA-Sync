@@ -12,6 +12,8 @@ This repo is intentionally split into public-safe and local-only files:
 - `ADO to Jira Sync.cmd` - Windows launcher and Command Prompt fallback
 - `ADO to Jira Sync.ps1` - preferred persistent PowerShell launcher
 - `Update.cmd` and `Update.ps1` - update a checkout without replacing local configuration or runtime data
+- `VERSION` - current application version
+- `CHANGELOG.md` - user-visible changes by release
 - `config.json` - local configuration file with your actual org URLs and Jira email
 
 Keep the local working script and local config file off Git. The public repo should only contain the safe, shareable versions.
@@ -45,6 +47,10 @@ The dependency list is stored in `requirements.txt` next to the scripts.
 - Avoids reposting matching Jira comments and existing attachment filenames.
 - Supports multiple Azure DevOps organizations using configurable Jira prefixes.
 - Writes the retrieved comments to `work_item_comments.csv` for review.
+
+## Versioning
+
+The current version is stored in the repository-root `VERSION` file and is shown in the startup log. Versions follow Semantic Versioning (`MAJOR.MINOR.PATCH`): increase MAJOR for incompatible changes, MINOR for backward-compatible features, and PATCH for backward-compatible fixes. Add user-visible changes to `CHANGELOG.md` under the matching version before releasing it.
 
 ## First-time setup
 
@@ -193,6 +199,18 @@ Status comments use a hidden marker containing the work item ID, state, and chan
 Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. HTML field values such as descriptions are converted to readable plain text, and formatting-only changes that render identically are omitted. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update, and a work-item/revision marker prevents duplicate comments. Only the latest revision is checked on each sync run.
 
 At the Jira issue-key prompt, press `F1` to display this README or `F2` to add an Azure DevOps organization. The `F2` flow asks for a Jira project-key prefix and Azure DevOps organization URL, then saves that mapping to the local `config.json` while retaining the existing Jira account settings. Add the new prefix's PAT to Windows as `AZDO_<PREFIX>_PAT` and restart the launcher so it can read the new environment variable. On non-Windows terminals, enter `F1` or `F2` as text instead of pressing the function key.
+
+## Screenshots
+
+These sanitized captures show the current version and workflow:
+
+![Current Jira issue prompt with F1 and F2 actions](screenshots/latest-jira-issue-prompt.svg)
+
+![Current sync preview with field-update reporting](screenshots/latest-sync-preview.svg)
+
+![Formatted Jira field-update comment](screenshots/latest-field-update-comment.svg)
+
+Setup and environment-variable examples are indexed in [screenshots/README.md](screenshots/README.md).
 
 The CSV export is written next to the script as `work_item_comments.csv`.
 

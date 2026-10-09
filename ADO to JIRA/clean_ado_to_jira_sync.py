@@ -22,6 +22,14 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 LOG_DIR = Path(__file__).resolve().parent / "logs"
 STATE_PATH = Path(__file__).resolve().parent / "run_state.json"
+VERSION_PATHS = (
+    Path(__file__).resolve().parent / "VERSION",
+    Path(__file__).resolve().parent.parent / "VERSION",
+)
+APP_VERSION = next(
+    (path.read_text(encoding="utf-8").strip() for path in VERSION_PATHS if path.is_file()),
+    "0+unknown",
+)
 DEFAULT_MAX_ATTACHMENT_SIZE_MB = 100
 ADO_CONFIGS = {}
 JIRA_BASE_URL = ""
@@ -953,7 +961,7 @@ def write_comments_csv(comments):
 def main():
     configure_logging()
     update_run_state("running")
-    LOGGER.info("Sync session started.")
+    LOGGER.info("Sync session started (version %s).", APP_VERSION)
     ensure_setup()
     ensure_environment_variables()
     jira_issue_key = get_jira_issue_key()

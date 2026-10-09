@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800">
+  <rect width="1400" height="800" fill="#1a1d22"/>
+  <g font-family="Consolas, 'Courier New', monospace" fill="#ebeef2" font-size="21">
+    <text x="40" y="62" fill="#6fdc99" font-size="28" font-weight="700">PS C:\ADO-to-Jira&gt;  Preview and field updates - Version 1.0.0</text>
+    <text x="44" y="125">ADO work item matching:</text>
+    <text x="44" y="164">Jira title/summary: DEMO-1234 - Registration request 1001</text>
+    <text x="44" y="203">Selected ADO work item ID: 1001</text>
+    <text x="44" y="242">Preview first? (y/n): n</text>
+    <text x="44" y="281">INFO: Retrieved 4 comment(s) and 1 attachment(s); CSV export written.</text>
+    <text x="44" y="320">INFO: Found status information for 1 work item(s).</text>
+    <text x="44" y="359">INFO: Found non-status field updates for 1 work item(s).</text>
+    <text x="44" y="398">Continue posting to Jira? (y/n): y</text>
+    <text x="44" y="437">INFO: Posted status for ADO work item 1001.</text>
+    <text x="44" y="476">INFO: Posted field updates for ADO work item 1001 revision 7.</text>
+    <text x="44" y="515">INFO: Sync run completed: posted 1 comment(s), failures 0.</text>
+    <text x="40" y="758" fill="#87919e" font-size="18">SANITIZED EXAMPLE - NO REAL CREDENTIALS OR WORK ITEM DATA</text>
+  </g>
+</svg>
