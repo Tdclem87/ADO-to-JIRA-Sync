@@ -8,8 +8,7 @@ if %errorlevel% equ 0 (
 	exit /b %errorlevel%
 )
 
-set "SCRIPT=ado_to_jira_sync.py"
-if not exist "%SCRIPT%" set "SCRIPT=clean_ado_to_jira_sync.py"
+set "SCRIPT=clean_ado_to_jira_sync.py"
 set "PYTHON=%~dp0..\..\.venv\Scripts\python.exe"
 if not exist "%PYTHON%" set "PYTHON=python"
 

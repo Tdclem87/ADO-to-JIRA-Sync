@@ -1,7 +1,4 @@
-$scriptName = "ado_to_jira_sync.py"
-if (-not (Test-Path (Join-Path $PSScriptRoot $scriptName))) {
-    $scriptName = "clean_ado_to_jira_sync.py"
-}
+$scriptName = "clean_ado_to_jira_sync.py"
 
 Set-Location $PSScriptRoot
 $pythonPath = Join-Path $PSScriptRoot "..\..\.venv\Scripts\python.exe"

@@ -11,7 +11,7 @@ This repo is intentionally split into public-safe and local-only files:
 - `README.md` - public documentation
 - `ADO to Jira Sync.cmd` - Windows launcher and Command Prompt fallback
 - `ADO to Jira Sync.ps1` - preferred persistent PowerShell launcher
-- `ado_to_jira_sync.py` - local working copy kept on your machine
+- `Update.cmd` and `Update.ps1` - update a checkout without replacing local configuration or runtime data
 - `config.json` - local configuration file with your actual org URLs and Jira email
 
 Keep the local working script and local config file off Git. The public repo should only contain the safe, shareable versions.
@@ -170,8 +170,7 @@ Double-click `ADO to Jira Sync.cmd` to launch the application. The launcher pref
 
 - uses `powershell.exe` when it is available
 - prefers the repository virtual environment at `.venv\Scripts\python.exe` when available
-- uses the local `ado_to_jira_sync.py` working copy when it is available
-- falls back to `clean_ado_to_jira_sync.py` for a public-safe checkout
+- uses the shared `clean_ado_to_jira_sync.py` script
 - keeps the console open after each run
 - automatically starts the first prompt again after the run finishes
 - preserves the previous run's console history instead of clearing the screen
@@ -210,8 +209,10 @@ The script also keeps a local `run_state.json` file with the latest session stat
 - Rotate any credential that may have been exposed.
 - Review the preview and destination Jira issue before answering `Continue posting to Jira?` with `Y`.
 
-## Public-safe workflow
+## Updating the app
 
-Use the clean, public-safe script for GitHub or other shared environments. Use the local working copy for your real configuration and testing.
+Clone the repository once, then run `ADO to JIRA/Update.cmd` whenever you want the latest version. The updater fetches the latest commit for the current branch and fast-forwards only; it refuses to proceed if tracked files have local edits. It does not reset or stash files. Keep personal configuration in the ignored `config.json` and credentials in Windows environment variables.
 
-This keeps your secrets local while still letting you commit a clean version that others can inspect and reuse.
+The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. If an update changes `requirements.txt`, the updater refreshes dependencies in the repository `.venv` when present, or uses the available Python installation otherwise. Git and Python must be installed on the computer.
+
+The updater does not replace ignored configuration, logs, run state, or generated CSV files. Local edits to tracked source files must be committed or otherwise resolved before updating.
