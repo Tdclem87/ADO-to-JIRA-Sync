@@ -35,7 +35,7 @@ Keep the local working script and local config file off Git. The public repo sho
 ## Install dependencies
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r ".\ADO to JIRA\requirements.txt"
 ```
 
 The dependency list is stored in `requirements.txt` next to the scripts.
@@ -82,18 +82,18 @@ Example format:
 
 ```json
 {
-	"ado_configs": {
-		"MBSD": {
-			"organization_url": "https://dev.azure.com/your-org"
-		},
-		"ONSD": {
-			"organization_url": "https://dev.azure.com/another-org"
-		}
-	},
-	"jira": {
-		"base_url": "https://your-company.atlassian.net",
-		"email": "you@example.com"
-	}
+  "ado_configs": {
+    "MBSD": {
+      "organization_url": "https://dev.azure.com/your-org"
+    },
+    "ONSD": {
+      "organization_url": "https://dev.azure.com/another-org"
+    }
+  },
+  "jira": {
+    "base_url": "https://your-company.atlassian.net",
+    "email": "you@example.com"
+  }
 }
 ```
 
@@ -169,7 +169,7 @@ To check whether a variable exists without exposing its value:
 
 ```powershell
 @("JIRA_API_TOKEN", "AZDO_MBSD_PAT", "AZDO_ONSD_PAT") | ForEach-Object {
-	"$_ set: " + [bool](Get-Item "Env:$_" -ErrorAction SilentlyContinue)
+    "$_ set: " + [bool](Get-Item "Env:$_" -ErrorAction SilentlyContinue)
 }
 ```
 
@@ -210,7 +210,7 @@ Status comments use a hidden marker containing the work item ID, state, and chan
 
 Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. HTML field values such as descriptions are converted to readable plain text, and formatting-only changes that render identically are omitted. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update, and a work-item/revision marker prevents duplicate comments. The first sync checks the latest revision; later runs process new revisions incrementally and retry any revision left pending by a prior failure.
 
-At the Jira issue-key prompt, press `F1` to display this README or `F2` to add an Azure DevOps organization. The `F2` flow asks for a Jira project-key prefix and Azure DevOps organization URL, then saves that mapping to the local `config.json` while retaining the existing Jira account settings. Add the new prefix's PAT to Windows as `AZDO_<PREFIX>_PAT` and restart the launcher so it can read the new environment variable. On non-Windows terminals, enter `F1` or `F2` as text instead of pressing the function key.
+At the Jira issue-key prompt, press `F1` to display this README, `F2` to add an Azure DevOps organization, or `F3` to display the changelog. The `F2` flow asks for a Jira project-key prefix and Azure DevOps organization URL, then saves that mapping to the local `config.json` while retaining the existing Jira account settings. Add the new prefix's PAT to Windows as `AZDO_<PREFIX>_PAT` and restart the launcher so it can read the new environment variable. On non-Windows terminals, enter `F1`, `F2`, or `F3` as text instead of pressing the function key.
 
 ## Screenshots
 
