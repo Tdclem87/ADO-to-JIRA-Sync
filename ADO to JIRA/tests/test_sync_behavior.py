@@ -30,15 +30,16 @@ class SyncLedgerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             ledger = SyncLedger(root / "ledger.sqlite3", root / "audit")
-            ledger.complete_event(
-                "https://ado.example/org",
-                42,
-                "fields",
-                "8",
-                "PROJ-7",
-                "posted",
-                run_id="run-one",
-            )
+            for revision in range(2, 9):
+                ledger.complete_event(
+                    "https://ado.example/org",
+                    42,
+                    "fields",
+                    str(revision),
+                    "PROJ-7",
+                    "posted",
+                    run_id="run-one",
+                )
             ledger.complete_event(
                 "https://ado.example/org",
                 42,
@@ -54,6 +55,28 @@ class SyncLedgerTests(unittest.TestCase):
                     "https://ado.example/org", 42, "PROJ-7", 11
                 ),
                 [9, 10, 11],
+            )
+            ledger.close()
+
+    def test_field_revision_window_recovers_gaps_before_latest_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            ledger = SyncLedger(root / "ledger.sqlite3", root / "audit")
+            ledger.complete_event(
+                "https://ado.example/org",
+                42,
+                "fields",
+                "14",
+                "PROJ-7",
+                "no_changes",
+                run_id="run-one",
+            )
+
+            self.assertEqual(
+                ledger.get_field_revisions_to_check(
+                    "https://ado.example/org", 42, "PROJ-7", 14
+                ),
+                list(range(2, 15)),
             )
             ledger.close()
 
@@ -107,6 +130,51 @@ class SyncLedgerTests(unittest.TestCase):
             self.assertFalse(sync_service._confirm_sync("PROJ-7"))
             self.assertTrue(sync_service._confirm_sync("PROJ-7"))
             self.assertFalse(sync_service._confirm_sync("PROJ-7"))
+
+    def test_previously_synced_comment_is_reimported_when_missing_from_jira(self):
+        posted_event = {"status": "posted"}
+
+        self.assertTrue(
+            sync_service._was_synced_comment_deleted(posted_event, None)
+        )
+        self.assertFalse(
+            sync_service._was_synced_comment_deleted(
+                posted_event, {"id": "jira-comment-1"}
+            )
+        )
+
+    def test_jira_issue_data_loads_all_comment_pages(self):
+        issue_response = Mock()
+        issue_response.raise_for_status.return_value = None
+        issue_response.json.return_value = {
+            "fields": {"summary": "ADO 526950", "attachment": []}
+        }
+        first_page = Mock()
+        first_page.raise_for_status.return_value = None
+        first_page.json.return_value = {
+            "total": 3,
+            "comments": [{"id": "1"}, {"id": "2"}],
+        }
+        second_page = Mock()
+        second_page.raise_for_status.return_value = None
+        second_page.json.return_value = {
+            "total": 3,
+            "comments": [{"id": "3"}],
+        }
+        with patch.object(sync_service.jira_client.RUNTIME, "config") as config:
+            config.jira_base_url = "https://jira.example"
+            config.jira_email = "user@example.com"
+            with patch.object(sync_service.jira_client.RUNTIME, "session") as session:
+                session.get.side_effect = [issue_response, first_page, second_page]
+                summary, attachments, comments = (
+                    sync_service.jira_client.get_jira_issue_data("PROJ-7", "token")
+                )
+
+        self.assertEqual(summary, "ADO 526950")
+        self.assertEqual(attachments, [])
+        self.assertEqual([comment["id"] for comment in comments], ["1", "2", "3"])
+        self.assertEqual(session.get.call_args_list[1].kwargs["params"]["startAt"], 0)
+        self.assertEqual(session.get.call_args_list[2].kwargs["params"]["startAt"], 2)
 
     def test_acceptance_criteria_field_update_is_not_ignored(self):
         mock_response = Mock()
@@ -181,6 +249,14 @@ class SyncLedgerTests(unittest.TestCase):
         )
         self.assertIn("Committed to Done", body)
         self.assertIn("Caleb Irving", body)
+
+    def test_only_latest_state_transition_is_returned_per_work_item(self):
+        earlier = {"work_item_id": 42, "revision": 12, "state": "Committed"}
+        latest = {"work_item_id": 42, "revision": 14, "state": "Done"}
+
+        self.assertEqual(
+            sync_service._latest_state_updates([earlier, latest]), [latest]
+        )
 
 
 class CommentRetryTests(unittest.TestCase):

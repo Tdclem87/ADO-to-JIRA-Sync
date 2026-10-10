@@ -159,8 +159,7 @@ class SyncLedger:
             """,
             (source_org, str(work_item_id), jira_issue_key),
         ).fetchall()
-        completed_revisions = []
-        pending_revisions = []
+        completed_revisions = set()
         completed_statuses = {"posted", "reconciled", "existing", "no_changes"}
         for row in rows:
             try:
@@ -168,17 +167,12 @@ class SyncLedger:
             except (TypeError, ValueError):
                 continue
             if row["status"] in completed_statuses:
-                completed_revisions.append(revision)
-            else:
-                pending_revisions.append(revision)
+                completed_revisions.add(revision)
 
-        if pending_revisions:
-            start_revision = min(pending_revisions)
-        elif completed_revisions:
-            start_revision = max(completed_revisions) + 1
-        else:
-            start_revision = latest_revision
-        return list(range(max(2, start_revision), latest_revision + 1))
+        for revision in range(2, latest_revision + 1):
+            if revision not in completed_revisions:
+                return list(range(revision, latest_revision + 1))
+        return []
 
     def summarize_run(self, run_id):
         rows = self.connection.execute(

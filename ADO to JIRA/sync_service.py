@@ -66,6 +66,14 @@ def _comment_source_id(comment):
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
+def _was_synced_comment_deleted(event, existing_jira_comment):
+    return bool(
+        event
+        and event["status"] in {"posted", "reconciled", "existing"}
+        and existing_jira_comment is None
+    )
+
+
 def _record_decision(
     jira_issue_key,
     event_type,
@@ -155,6 +163,18 @@ def _format_field_update_body(field_update):
         "Updated fields:\n"
         + "\n".join(field_lines)
     )
+
+
+def _latest_state_updates(status_updates):
+    latest_by_work_item = {}
+    for status_update in status_updates:
+        work_item_id = status_update["work_item_id"]
+        previous = latest_by_work_item.get(work_item_id)
+        if previous is None or int(status_update["revision"]) > int(
+            previous["revision"]
+        ):
+            latest_by_work_item[work_item_id] = status_update
+    return list(latest_by_work_item.values())
 
 
 def _find_jira_comment(jira_comments, marker=None, legacy_text=None):
@@ -617,13 +637,6 @@ def run_sync():
         marker = _event_marker(
             "comment", source_org, comment["WorkItemId"], source_id
         )
-        event = _get_ledger_event(
-            source_org,
-            comment["WorkItemId"],
-            "comment",
-            source_id,
-            jira_issue_key,
-        )
         legacy_header = (
             f"Comment Created by: {comment['CommentCreatedBy']}\n"
             f"Date Created: {format_ado_timestamp(comment['CommentCreatedDate'])}"
@@ -633,7 +646,7 @@ def run_sync():
             marker=marker,
             legacy_text=legacy_header + comment["PlainText"],
         )
-        if (event and event["status"] in {"posted", "reconciled", "existing"}) or existing:
+        if existing:
             comments_already_synced += 1
         else:
             comments_to_post += 1
@@ -974,22 +987,9 @@ def run_sync():
         existing_jira_comment = _find_jira_comment(
             jira_comments, marker=marker, legacy_text=legacy_text
         )
-        ledger_completed = bool(
-            event and event["status"] in {"posted", "reconciled", "existing"}
+        reimported_deleted_comment = _was_synced_comment_deleted(
+            event, existing_jira_comment
         )
-        if ledger_completed and existing_jira_comment is None:
-            skipped_count += 1
-            _record_decision(
-                jira_issue_key,
-                "comment",
-                "skipped_ledger",
-                source_org=source_org,
-                work_item_id=comment["WorkItemId"],
-                source_id=source_id,
-                target_id=event.get("target_id"),
-                details={"comment_id": comment["CommentId"]},
-            )
-            continue
         if existing_jira_comment:
             skipped_count += 1
             _complete_ledger_event(
@@ -1061,7 +1061,10 @@ def run_sync():
                 jira_issue_key,
                 "reconciled" if outcome == "reconciled" else "posted",
                 target_id=target_id,
-                details={"comment_id": comment["CommentId"]},
+                details={
+                    "comment_id": comment["CommentId"],
+                    "reimported_deleted_comment": reimported_deleted_comment,
+                },
                 source_data=comment,
             )
             _record_decision(
@@ -1072,10 +1075,16 @@ def run_sync():
                 work_item_id=comment["WorkItemId"],
                 source_id=source_id,
                 target_id=target_id,
-                details={"comment_id": comment["CommentId"]},
+                details={
+                    "comment_id": comment["CommentId"],
+                    "reimported_deleted_comment": reimported_deleted_comment,
+                },
             )
             posted_count += 1
-            LOGGER.info("%s one Jira comment.", outcome.capitalize())
+            if reimported_deleted_comment:
+                LOGGER.info("Re-imported a deleted Jira comment from ADO.")
+            else:
+                LOGGER.info("%s one Jira comment.", outcome.capitalize())
         except Exception as error:
             _complete_ledger_event(
                 source_org,
@@ -1100,7 +1109,7 @@ def run_sync():
     status_posted_count = 0
     status_skipped_count = 0
     seen_status_markers = set()
-    for work_item_status in work_item_statuses:
+    for work_item_status in _latest_state_updates(work_item_statuses):
         source_org = work_item_by_id[work_item_status["work_item_id"]]["organization_url"]
         changed_date = work_item_status["changed_date"]
         source_id = f"{work_item_status['state']}:{changed_date}"

@@ -59,28 +59,59 @@ def get_attachment_size(attachment, pat):
         response.close()
 
 
-def get_jira_issue_data(issue_key, jira_api_token):
+def get_jira_issue_data(issue_key, jira_api_token, include_comments=True):
     config = RUNTIME.config
     response = RUNTIME.session.get(
         f"{config.jira_base_url}/rest/api/3/issue/{issue_key}",
-        params={"fields": "summary,attachment,comment"},
+        params={"fields": "summary,attachment"},
         auth=(config.jira_email, jira_api_token),
         headers={"Accept": "application/json"},
         timeout=30,
     )
     response.raise_for_status()
     fields = response.json().get("fields", {})
+    summary = fields.get("summary", "")
+    attachments = fields.get("attachment", [])
+    if not include_comments:
+        return summary, attachments, []
+
+    comments = []
+    start_at = 0
+    max_results = 100
+    while True:
+        comment_response = RUNTIME.session.get(
+            f"{config.jira_base_url}/rest/api/3/issue/{issue_key}/comment",
+            params={"startAt": start_at, "maxResults": max_results},
+            auth=(config.jira_email, jira_api_token),
+            headers={"Accept": "application/json"},
+            timeout=30,
+        )
+        comment_response.raise_for_status()
+        comment_page = comment_response.json()
+        page_comments = comment_page.get("comments", [])
+        comments.extend(page_comments)
+        start_at += len(page_comments)
+        total = comment_page.get("total")
+        if (
+            not page_comments
+            or comment_page.get("isLast") is True
+            or (total is not None and start_at >= int(total))
+            or (total is None and len(page_comments) < max_results)
+        ):
+            break
     return (
-        fields.get("summary", ""),
-        fields.get("attachment", []),
-        fields.get("comment", {}).get("comments", []),
+        summary,
+        attachments,
+        comments,
     )
 
 
 def _find_new_jira_attachment(
     issue_key, filename, jira_api_token, known_attachment_ids
 ):
-    _, attachments, _ = get_jira_issue_data(issue_key, jira_api_token)
+    _, attachments, _ = get_jira_issue_data(
+        issue_key, jira_api_token, include_comments=False
+    )
     existing = next(
         (
             attachment
