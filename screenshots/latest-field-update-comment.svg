@@ -1,16 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800">
-  <rect width="1400" height="800" fill="#1a1d22"/>
-  <g font-family="Consolas, 'Courier New', monospace" fill="#ebeef2" font-size="21">
-    <text x="40" y="62" fill="#6fdc99" font-size="28" font-weight="700">Formatted Jira field update - Version 1.0.0</text>
-    <text x="44" y="128">[ADO_TO_JIRA_FIELDS:1001:7] ADO work item 1001 fields updated</text>
-    <text x="44" y="186">Revision: 7</text>
-    <text x="44" y="225">Changed by: Alex Example</text>
-    <text x="44" y="264">Changed: 2026-10-09 10:30:00 UTC</text>
-    <text x="44" y="322">Updated fields:</text>
-    <text x="44" y="361">System.Description: Requirements: Update the registration form. -&gt;</text>
-    <text x="44" y="400">  Requirements: Add an optional contact field.</text>
-    <text x="44" y="439">System.AssignedTo: (empty) -&gt; Alex Example</text>
-    <text x="44" y="500" fill="#aeb8c4">HTML tags removed; entities decoded; formatting-only changes omitted.</text>
-    <text x="40" y="758" fill="#87919e" font-size="18">SANITIZED EXAMPLE - NO REAL CREDENTIALS OR WORK ITEM DATA</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-labelledby="title desc">
+  <title id="title">Jira field update comment, version 1.1.0</title>
+  <desc id="desc">Sanitized Jira comment with the replay-safe marker and before-and-after field values.</desc>
+  <rect width="1400" height="800" fill="#111820"/>
+  <rect x="24" y="24" width="1352" height="752" rx="8" fill="#171f29" stroke="#354252" stroke-width="2"/>
+  <rect x="24" y="24" width="1352" height="58" rx="8" fill="#202b37"/>
+  <circle cx="54" cy="53" r="7" fill="#ff6b64"/>
+  <circle cx="80" cy="53" r="7" fill="#f4bd50"/>
+  <circle cx="106" cy="53" r="7" fill="#60c689"/>
+  <text x="700" y="60" text-anchor="middle" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="18">Example Jira field update comment</text>
+  <g font-family="Consolas, 'Courier New', monospace" font-size="20" xml:space="preserve">
+    <text x="58" y="132" fill="#79d99a" font-size="22" font-weight="700">[ADO_TO_JIRA_FIELDS:a1b2c3d4e5f607182930] [ADO_TO_JIRA_FIELDS:1001:8]</text>
+    <text x="58" y="164" fill="#f2f5f7" font-size="20">ADO work item 1001 fields updated</text>
+    <text x="58" y="220" fill="#f2f5f7">Revision: 8</text>
+    <text x="58" y="256" fill="#f2f5f7">Changed by: Alex Example</text>
+    <text x="58" y="292" fill="#f2f5f7">Changed: 2026-10-09 10:30:00 UTC</text>
+    <text x="58" y="348" fill="#f2f5f7">Updated fields:</text>
+    <text x="58" y="384" fill="#f2f5f7">System.Description: Requirements: Update the registration form. -&gt;</text>
+    <text x="58" y="416" fill="#f2f5f7">Requirements: Add an optional contact field.</text>
+    <text x="58" y="452" fill="#f2f5f7">System.AssignedTo: (empty) -&gt; Alex Example</text>
   </g>
+  <text x="58" y="514" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="17">Replay marker identifies this source work item and revision.</text>
+  <text x="58" y="735" fill="#728293" font-family="Consolas, 'Courier New', monospace" font-size="16" letter-spacing="1">SANITIZED EXAMPLE | NO REAL CREDENTIALS OR WORK ITEM DATA</text>
 </svg>

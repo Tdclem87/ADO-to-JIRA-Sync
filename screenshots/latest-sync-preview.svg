@@ -1,18 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800">
-  <rect width="1400" height="800" fill="#1a1d22"/>
-  <g font-family="Consolas, 'Courier New', monospace" fill="#ebeef2" font-size="21">
-    <text x="40" y="62" fill="#6fdc99" font-size="28" font-weight="700">PS C:\ADO-to-Jira&gt;  Preview and field updates - Version 1.0.0</text>
-    <text x="44" y="125">ADO work item matching:</text>
-    <text x="44" y="164">Jira title/summary: DEMO-1234 - Registration request 1001</text>
-    <text x="44" y="203">Selected ADO work item ID: 1001</text>
-    <text x="44" y="242">Preview first? (y/n): n</text>
-    <text x="44" y="281">INFO: Retrieved 4 comment(s) and 1 attachment(s); CSV export written.</text>
-    <text x="44" y="320">INFO: Found status information for 1 work item(s).</text>
-    <text x="44" y="359">INFO: Found non-status field updates for 1 work item(s).</text>
-    <text x="44" y="398">Continue posting to Jira? (y/n): y</text>
-    <text x="44" y="437">INFO: Posted status for ADO work item 1001.</text>
-    <text x="44" y="476">INFO: Posted field updates for ADO work item 1001 revision 7.</text>
-    <text x="44" y="515">INFO: Sync run completed: posted 1 comment(s), failures 0.</text>
-    <text x="40" y="758" fill="#87919e" font-size="18">SANITIZED EXAMPLE - NO REAL CREDENTIALS OR WORK ITEM DATA</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Sync preflight and summary, version 1.1.0</title>
+  <desc id="desc">Sanitized current preflight lists planned work and requires typing YES before applying the sync.</desc>
+  <rect width="1600" height="1120" fill="#111820"/>
+  <rect x="22" y="22" width="1556" height="1076" rx="8" fill="#171f29" stroke="#354252" stroke-width="2"/>
+  <rect x="22" y="22" width="1556" height="56" rx="8" fill="#202b37"/>
+  <circle cx="52" cy="50" r="7" fill="#ff6b64"/>
+  <circle cx="78" cy="50" r="7" fill="#f4bd50"/>
+  <circle cx="104" cy="50" r="7" fill="#60c689"/>
+  <text x="800" y="57" text-anchor="middle" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="18">Azure DevOps to Jira Sync</text>
+  <g font-family="Consolas, 'Courier New', monospace" font-size="18" xml:space="preserve">
+    <text x="54" y="116" fill="#79d99a" font-size="21" font-weight="700">PS C:\ADO-to-Jira&gt; Sync preflight - Version 1.1.0</text>
+    <text x="54" y="153" fill="#f2f5f7">ADO work item matching:</text>
+    <text x="54" y="181" fill="#aab7c5">Jira title/summary: DEMO-1234 - Registration request 1001</text>
+    <text x="54" y="209" fill="#aab7c5">Selected ADO work item ID: 1001</text>
+    <text x="54" y="237" fill="#aab7c5">Show detailed retrieval logs? (y/n): n</text>
+    <text x="54" y="282" fill="#79d99a" font-size="20" font-weight="700">Sync preflight</text>
+    <text x="54" y="312" fill="#f2f5f7">Run ID: 7b43f1a98638460ea60e54fa983281dd</text>
+    <text x="54" y="340" fill="#f2f5f7">Jira issue: DEMO-1234</text>
+    <text x="54" y="368" fill="#f2f5f7">Source organizations: https://dev.azure.com/example-org</text>
+    <text x="54" y="396" fill="#f2f5f7">ADO work items: 1001</text>
+    <text x="54" y="424" fill="#f2f5f7">Comments: 1 to post, 2 already synced/present</text>
+    <text x="54" y="452" fill="#f2f5f7">State updates to post: 1</text>
+    <text x="54" y="480" fill="#f2f5f7">Field revisions to post: 1</text>
+    <text x="54" y="508" fill="#f2f5f7">Attachments to process: 1</text>
+    <text x="54" y="553" fill="#aab7c5">Comment from ADO DEMO item 1001 (Alex Example, 2026-10-09):</text>
+    <text x="54" y="581" fill="#f2f5f7">Please add an optional contact field to the registration form.</text>
+    <text x="54" y="623" fill="#f2f5f7">Status for ADO item 1001: Active (changed by Alex Example)</text>
+    <text x="54" y="661" fill="#f2f5f7">Field revision 8 for ADO item 1001:</text>
+    <text x="74" y="689" fill="#f2f5f7">System.Description: Existing requirements -&gt; Updated requirements</text>
+    <text x="54" y="727" fill="#79d99a">- registration-guide.pdf: 2.4 MB; will be uploaded;</text>
+    <text x="74" y="755" fill="#79d99a">source https://dev.azure.com/example-org/attachments/1001/file</text>
+    <text x="54" y="803" fill="#79d99a" font-size="20" font-weight="700">Type YES to apply this sync to DEMO-1234: YES</text>
+    <text x="54" y="850" fill="#79d99a" font-size="20" font-weight="700">Sync summary</text>
+    <text x="54" y="880" fill="#f2f5f7">Run ID: 7b43f1a98638460ea60e54fa983281dd | Jira issue: DEMO-1234</text>
+    <text x="54" y="910" fill="#f2f5f7">Comments posted or reconciled: 1 | Comments skipped as duplicates: 2</text>
+    <text x="54" y="940" fill="#f2f5f7">State updates posted: 1 | Field revisions posted: 1</text>
+    <text x="54" y="970" fill="#f2f5f7">Attachments uploaded: 1 | Reconciled: 0 | Linked: 0 | Failures: 0</text>
   </g>
+  <text x="54" y="1056" fill="#728293" font-family="Consolas, 'Courier New', monospace" font-size="15" letter-spacing="1">SANITIZED EXAMPLE | NO REAL CREDENTIALS OR ORGANIZATION DATA</text>
 </svg>

@@ -216,11 +216,11 @@ At the Jira issue-key prompt, press `F1` to display this README or `F2` to add a
 
 These sanitized captures show the current version and workflow:
 
-![Current Jira issue prompt with F1 and F2 actions](screenshots/jira-issue-prompt.png)
+![Current Jira issue prompt with F1, F2, and F3 actions](screenshots/latest-jira-issue-prompt.svg)
 
-![Current sync preview with field-update reporting](screenshots/preview-mode.png)
+![Current sync preview with explicit confirmation and summary](screenshots/latest-sync-preview.svg)
 
-![Formatted Jira field-update comment](screenshots/field-update-comment.png)
+![Formatted Jira field-update comment with replay marker](screenshots/latest-field-update-comment.svg)
 
 Setup and environment-variable examples are indexed in [screenshots/README.md](screenshots/README.md).
 

@@ -2,17 +2,15 @@
 
 Store screenshots of the Azure DevOps to Jira Sync application in this folder.
 
-Current-version screenshots:
+Current-version screenshots (sanitized SVG captures):
 
-- [Jira issue prompt](jira-issue-prompt.png) - version display and F1/F2 actions
-- [Sync preview](preview-mode.png) - ADO matching, status, and field-update summary
-- [Field update comment](field-update-comment.png) - formatted before/after values
+- [Jira issue prompt](latest-jira-issue-prompt.svg) - version display and F1/F2/F3 actions
+- [Sync preview](latest-sync-preview.svg) - detailed preflight, YES confirmation, and run summary
+- [Field update comment](latest-field-update-comment.svg) - replay marker and before/after values
 
-The setup and credential-guidance screenshots remain current:
+Current setup and credential-guidance screenshots:
 
-- [First-run setup](first-run-setup.png)
-- [Environment-variable guidance](environment-variables.png)
-
-SVG versions of the current prompt, preview, and field-update examples are also available with the `latest-` prefix.
+- [First-run setup](first-run-setup.svg) - sanitized multi-organization configuration flow
+- [Environment-variable guidance](latest-environment-variables.svg) - token setup and Windows environment editor flow
 
 Do not include screenshots containing PATs, API tokens, passwords, private URLs, personal information, or sensitive work-item content.

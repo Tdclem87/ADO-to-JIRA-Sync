@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img" aria-labelledby="title desc">
+  <title id="title">Environment-variable guidance, version 1.1.0</title>
+  <desc id="desc">Sanitized application guidance listing missing Jira and Azure DevOps tokens, setup steps, and the Windows environment editor prompt.</desc>
+  <rect width="1600" height="1180" fill="#111820"/>
+  <rect x="22" y="22" width="1556" height="1136" rx="8" fill="#171f29" stroke="#354252" stroke-width="2"/>
+  <rect x="22" y="22" width="1556" height="56" rx="8" fill="#202b37"/>
+  <circle cx="52" cy="50" r="7" fill="#ff6b64"/>
+  <circle cx="78" cy="50" r="7" fill="#f4bd50"/>
+  <circle cx="104" cy="50" r="7" fill="#60c689"/>
+  <text x="800" y="57" text-anchor="middle" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="18">Azure DevOps to Jira Sync</text>
+  <g font-family="Consolas, 'Courier New', monospace" font-size="17" xml:space="preserve">
+    <text x="54" y="118" fill="#79d99a" font-size="21" font-weight="700">PS C:\ADO-to-Jira&gt; Environment-variable guidance - Version 1.1.0</text>
+    <text x="54" y="164" fill="#f2f5f7" font-size="18">Missing environment variables:</text>
+    <text x="54" y="192" fill="#f2f5f7">- JIRA_API_TOKEN (Jira API token)</text>
+    <text x="54" y="220" fill="#f2f5f7">- AZDO_DEMO_PAT (DEMO Azure DevOps PAT)</text>
+    <text x="54" y="248" fill="#f2f5f7">- AZDO_TEST_PAT (TEST Azure DevOps PAT)</text>
+    <text x="54" y="290" fill="#aab7c5">Create the required tokens if you do not already have them:</text>
+    <text x="54" y="312" fill="#79d99a">Jira API token:</text>
+    <text x="54" y="338" fill="#f2f5f7">1. Open https://id.atlassian.com/manage-profile/security/api-tokens</text>
+    <text x="54" y="364" fill="#f2f5f7">2. Select Create API token, enter a label, and create the token.</text>
+    <text x="54" y="390" fill="#f2f5f7">3. Copy it immediately; Atlassian will not show it again.</text>
+    <text x="54" y="416" fill="#f2f5f7">4. Store it as JIRA_API_TOKEN in Windows environment variables.</text>
+    <text x="54" y="452" fill="#79d99a">Azure DevOps PAT, once for each organization:</text>
+    <text x="54" y="478" fill="#f2f5f7">1. Sign in to the Azure DevOps organization.</text>
+    <text x="54" y="504" fill="#f2f5f7">2. Select your profile icon, then User settings &gt; Personal access tokens.</text>
+    <text x="54" y="530" fill="#f2f5f7">3. Select New Token, then enter a name and expiration date.</text>
+    <text x="54" y="556" fill="#f2f5f7">4. Choose the organization and minimum Work Items read access needed.</text>
+    <text x="54" y="582" fill="#f2f5f7">5. Create the PAT and copy it immediately; it will not be shown again.</text>
+    <text x="54" y="608" fill="#f2f5f7">6. Store it as AZDO_&lt;PREFIX&gt;_PAT, using each configured prefix.</text>
+    <text x="54" y="644" fill="#aab7c5">Add the missing values in Windows:</text>
+    <text x="54" y="670" fill="#f2f5f7">1. Press the Windows key and search for environment variables.</text>
+    <text x="54" y="696" fill="#f2f5f7">2. Open Edit the system environment variables.</text>
+    <text x="54" y="722" fill="#f2f5f7">3. Select Environment Variables.</text>
+    <text x="54" y="748" fill="#f2f5f7">4. Under User variables, select New.</text>
+    <text x="54" y="774" fill="#f2f5f7">5. Enter each missing variable name exactly as listed.</text>
+    <text x="54" y="800" fill="#f2f5f7">6. Enter the matching Jira token or Azure DevOps PAT value.</text>
+    <text x="54" y="826" fill="#f2f5f7">7. Select OK on each window to save the changes.</text>
+    <text x="54" y="852" fill="#f2f5f7">8. Close and reopen PowerShell, Command Prompt, or VS Code.</text>
+    <text x="54" y="888" fill="#aab7c5">Never put token values in config.json or Git.</text>
+    <text x="54" y="932" fill="#79d99a">Open Windows Environment Variables now to add them? (y/n): y</text>
+    <text x="54" y="970" fill="#f2f5f7">Opened the Windows Environment Variables window.</text>
+    <text x="54" y="1008" fill="#f2f5f7">After you add the missing values, press Enter to continue...</text>
+  </g>
+  <text x="54" y="1116" fill="#728293" font-family="Consolas, 'Courier New', monospace" font-size="15" letter-spacing="1">SANITIZED EXAMPLE | TOKEN VALUES ARE NEVER SHOWN</text>
+</svg>

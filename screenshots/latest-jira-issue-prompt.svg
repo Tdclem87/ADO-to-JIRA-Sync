@@ -1,11 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800">
-  <rect width="1400" height="800" fill="#1a1d22"/>
-  <g font-family="Consolas, 'Courier New', monospace">
-    <text x="40" y="62" fill="#6fdc99" font-size="28" font-weight="700">PS C:\ADO-to-Jira&gt;  Azure DevOps to Jira Sync - Version 1.0.0</text>
-    <text x="44" y="128" fill="#ebeef2" font-size="22">INFO: Sync session started (version 1.0.0).</text>
-    <text x="44" y="170" fill="#ebeef2" font-size="22">INFO: Loaded configuration for 2 Azure DevOps organization(s).</text>
-    <text x="44" y="212" fill="#ebeef2" font-size="22">INFO: All required environment variables are available.</text>
-    <text x="44" y="282" fill="#ebeef2" font-size="22">Jira issue key (DEMO / TEST; F1 README; F2 add organization):</text>
-    <text x="40" y="758" fill="#87919e" font-size="18">SANITIZED EXAMPLE - NO REAL CREDENTIALS OR WORK ITEM DATA</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-labelledby="title desc">
+  <title id="title">Jira issue prompt, version 1.1.0</title>
+  <desc id="desc">Sanitized application startup showing the Jira issue prompt and F1, F2, and F3 shortcuts.</desc>
+  <rect width="1400" height="800" fill="#111820"/>
+  <rect x="24" y="24" width="1352" height="752" rx="8" fill="#171f29" stroke="#354252" stroke-width="2"/>
+  <rect x="24" y="24" width="1352" height="58" rx="8" fill="#202b37"/>
+  <circle cx="54" cy="53" r="7" fill="#ff6b64"/>
+  <circle cx="80" cy="53" r="7" fill="#f4bd50"/>
+  <circle cx="106" cy="53" r="7" fill="#60c689"/>
+  <text x="700" y="60" text-anchor="middle" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="18">Azure DevOps to Jira Sync</text>
+  <g font-family="Consolas, 'Courier New', monospace" xml:space="preserve">
+    <text x="64" y="145" fill="#79d99a" font-size="24" font-weight="700">PS C:\ADO-to-Jira&gt; Azure DevOps to Jira Sync - Version 1.1.0</text>
+    <text x="64" y="224" fill="#f2f5f7" font-size="22">INFO: Sync session started (version 1.1.0).</text>
+    <text x="64" y="266" fill="#f2f5f7" font-size="22">INFO: Loaded configuration for 2 Azure DevOps organization(s).</text>
+    <text x="64" y="308" fill="#f2f5f7" font-size="22">INFO: All required environment variables are available.</text>
+    <text x="64" y="390" fill="#f2f5f7" font-size="22">Jira issue key (DEMO / TEST; F1 README; F2 add organization; F3 changelog):</text>
   </g>
+  <text x="64" y="735" fill="#728293" font-family="Consolas, 'Courier New', monospace" font-size="16" letter-spacing="1">SANITIZED EXAMPLE | NO REAL CREDENTIALS OR WORK ITEM DATA</text>
 </svg>
