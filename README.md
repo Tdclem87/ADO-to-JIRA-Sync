@@ -6,7 +6,13 @@ This project copies Azure DevOps work item comments and attachments into Jira is
 
 This repo is intentionally split into public-safe and local-only files:
 
-- `clean_ado_to_jira_sync.py` - public-safe version for GitHub
+- `clean_ado_to_jira_sync.py` - launcher-compatible CLI entry point
+- `cli.py` - command-line startup and top-level error handling
+- `config.py` - configuration, first-run setup, logging, and run-state persistence
+- `ado_client.py` and `jira_client.py` - Azure DevOps and Jira API operations
+- `transforms.py` - comment, attachment, and field-value transformations
+- `models.py` - application configuration and shared runtime state
+- `sync_service.py` - synchronization workflow and posting orchestration
 - `config.example.json` - example configuration template
 - `README.md` - public documentation
 - `ADO to Jira Sync.cmd` - Windows launcher and Command Prompt fallback
