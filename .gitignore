@@ -5,6 +5,10 @@
 ADO to JIRA/config.json
 ADO to JIRA/logs/
 ADO to JIRA/run_state.json
+ADO to JIRA/audit/
+ADO to JIRA/*.sqlite3
+ADO to JIRA/*.sqlite3-shm
+ADO to JIRA/*.sqlite3-wal
 
 # Generated output
 *.csv

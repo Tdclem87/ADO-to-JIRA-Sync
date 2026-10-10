@@ -15,9 +15,9 @@ This repo is intentionally split into public-safe and local-only files:
 - `sync_service.py` - synchronization workflow and posting orchestration
 - `config.example.json` - example configuration template
 - `README.md` - public documentation
-- `ADO to Jira Sync.cmd` - Windows launcher and Command Prompt fallback
+- `Run ADO to Jira Sync.cmd` - Windows launcher and Command Prompt fallback
 - `ADO to Jira Sync.ps1` - preferred persistent PowerShell launcher
-- `Update.cmd` and `Update.ps1` - update a checkout without replacing local configuration or runtime data
+- `Update ADO to Jira Sync.cmd` and `Update.ps1` - update a checkout without replacing local configuration or runtime data
 - `VERSION` - current application version
 - `CHANGELOG.md` - user-visible changes by release
 - `config.json` - local configuration file with your actual org URLs and Jira email
@@ -185,7 +185,7 @@ python clean_ado_to_jira_sync.py
 
 ### Use the automatic Windows launcher
 
-Double-click `ADO to Jira Sync.cmd` to launch the application. The launcher checks for updates automatically before the first sync run when Windows PowerShell is available, and falls back to a Command Prompt loop if it is not. The fallback displays that it skipped the update check. It:
+Double-click `Run ADO to Jira Sync.cmd` to launch the application. The launcher checks for updates automatically before the first sync run when Windows PowerShell is available, and falls back to a Command Prompt loop if it is not. The fallback displays that it skipped the update check. It:
 
 - uses `powershell.exe` when it is available
 - fast-forwards the current Git branch when updates are available and tracked files have no local edits
@@ -199,7 +199,7 @@ Double-click `ADO to Jira Sync.cmd` to launch the application. The launcher chec
 You can also start it from PowerShell or Command Prompt:
 
 ```powershell
-& ".\ADO to Jira Sync.cmd"
+& ".\Run ADO to Jira Sync.cmd"
 ```
 
 The launcher does not contain credentials. Tokens continue to come from Windows environment variables.
@@ -248,7 +248,7 @@ Set `failure_mode` in `config.json` to `continue` (the default) to record an ite
 
 ## Updating the app
 
-When you start `ADO to Jira Sync.cmd`, it checks for updates before showing the first sync prompt. The console reports whether it is checking, updated, already current, or continuing after an update error. You do not need to run the updater separately. To check manually, run `ADO to JIRA/Update.cmd`.
+When you start `Run ADO to Jira Sync.cmd`, it checks for updates before showing the first sync prompt. The console reports whether it is checking, updated, already current, or continuing after an update error. You do not need to run the updater separately. To check manually, run `ADO to JIRA/Update ADO to Jira Sync.cmd`.
 
 The updater uses Git to fast-forward the current branch. It will not update if tracked files have local edits, and it never resets or stashes files. Resolve or commit those edits, then start the launcher again. Ignored configuration, logs, run state, and generated CSV files are not replaced.
 

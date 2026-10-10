@@ -54,7 +54,7 @@ if ($installedRequirementsHash -ne $requirementsHash) {
     if (-not (Test-Path $pythonPath)) {
         $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
         if (-not $pythonCommand) {
-            throw "Python is required because this update changed dependencies. Install Python and run Update.cmd again."
+            throw "Python is required because this update changed dependencies. Install Python and run Update ADO to Jira Sync.cmd again."
         }
         $pythonPath = $pythonCommand.Source
     }
