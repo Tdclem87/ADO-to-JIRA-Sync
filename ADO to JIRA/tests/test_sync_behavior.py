@@ -101,6 +101,13 @@ class SyncLedgerTests(unittest.TestCase):
             )
             ledger.close()
 
+    def test_sync_confirmation_accepts_case_insensitive_y_or_n(self):
+        with patch("builtins.input", side_effect=["Y", "n", "YeS", "N"]):
+            self.assertTrue(sync_service._confirm_sync("PROJ-7"))
+            self.assertFalse(sync_service._confirm_sync("PROJ-7"))
+            self.assertTrue(sync_service._confirm_sync("PROJ-7"))
+            self.assertFalse(sync_service._confirm_sync("PROJ-7"))
+
 
 class CommentRetryTests(unittest.TestCase):
     def _server_error(self):

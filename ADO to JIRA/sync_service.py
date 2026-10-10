@@ -37,6 +37,11 @@ LOGGER = RUNTIME.logger
 PREFLIGHT_TEXT_WARNING_CHARS = 30000
 
 
+def _confirm_sync(jira_issue_key):
+    response = input(f"Type Y/N to apply this sync to {jira_issue_key}: ").strip().lower()
+    return response in {"y", "yes"}
+
+
 def _event_marker(event_type, source_org, work_item_id, source_id):
     identity = json.dumps(
         [source_org, str(work_item_id), event_type, str(source_id)],
@@ -703,7 +708,7 @@ def run_sync():
             f"source {attachment['url']}"
         )
 
-    if input(f"Type YES to apply this sync to {jira_issue_key}: ").strip() != "YES":
+    if not _confirm_sync(jira_issue_key):
         update_run_state("cancelled", reason="User declined Jira posting.")
         _record_decision(jira_issue_key, "preflight", "cancelled", details=preflight)
         LOGGER.info("Sync cancelled before Jira posting.")
