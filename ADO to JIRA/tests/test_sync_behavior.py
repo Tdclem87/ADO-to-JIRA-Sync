@@ -108,6 +108,68 @@ class SyncLedgerTests(unittest.TestCase):
             self.assertTrue(sync_service._confirm_sync("PROJ-7"))
             self.assertFalse(sync_service._confirm_sync("PROJ-7"))
 
+    def test_acceptance_criteria_field_update_is_not_ignored(self):
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {
+            "rev": 7,
+            "revisedBy": {"displayName": "Caleb Irving"},
+            "revisedDate": "2026-10-10T00:00:00Z",
+            "fields": {
+                "Microsoft.VSTS.Common.AcceptanceCriteria": {
+                    "oldValue": "<p>old</p>",
+                    "newValue": "<p>new</p>",
+                }
+            },
+        }
+        with patch.object(sync_service.RUNTIME, "session") as session:
+            session.get.return_value = mock_response
+            update = sync_service.ado_client.get_work_item_field_update(
+                "https://ado.example/org", 42, 7, "token"
+            )
+        self.assertIsNotNone(update)
+        self.assertIn("Microsoft.VSTS.Common.AcceptanceCriteria", update["fields"])
+        self.assertEqual(update["changed_by"], "Caleb Irving")
+        self.assertNotIn("state_change", update)
+        body = sync_service._format_field_update_body(update)
+        self.assertIn("Fields updated by: Caleb Irving", body)
+        self.assertIn("AcceptanceCriteria: old -> new", body)
+
+    def test_state_change_is_taken_from_revision_with_its_author(self):
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {
+            "rev": 7,
+            "revisedBy": {"displayName": "Caleb Irving"},
+            "revisedDate": "2026-10-05T00:00:00Z",
+            "fields": {
+                "System.State": {"oldValue": "Committed", "newValue": "Done"},
+                "Microsoft.VSTS.Common.AcceptanceCriteria": {
+                    "oldValue": "old criteria",
+                    "newValue": "new criteria",
+                },
+            },
+        }
+        with patch.object(sync_service.RUNTIME, "session") as session:
+            session.get.return_value = mock_response
+            update = sync_service.ado_client.get_work_item_field_update(
+                "https://ado.example/org", 42, 7, "token"
+            )
+
+        self.assertEqual(update["state_change"], {"old_value": "Committed", "new_value": "Done"})
+        self.assertEqual(update["changed_by"], "Caleb Irving")
+        self.assertIn("Microsoft.VSTS.Common.AcceptanceCriteria", update["fields"])
+        body = sync_service._format_status_update_body(
+            {
+                "old_state": "Committed",
+                "state": "Done",
+                "changed_by": update["changed_by"],
+                "changed_date": update["changed_date"],
+            }
+        )
+        self.assertIn("Committed to Done", body)
+        self.assertIn("Caleb Irving", body)
+
 
 class CommentRetryTests(unittest.TestCase):
     def _server_error(self):

@@ -131,6 +131,31 @@ def _work_item_event_identity(source_org, work_item_id, source_id):
     return source_org, str(work_item_id), str(source_id)
 
 
+def _format_status_update_body(status_update):
+    return (
+        f"State changed from {format_ado_field_value(status_update['old_state'])} "
+        f"to {format_ado_field_value(status_update['state'])}\n"
+        f"Changed by: {status_update['changed_by']}\n"
+        f"Changed: {format_ado_timestamp(status_update['changed_date'])}"
+    )
+
+
+def _format_field_update_body(field_update):
+    field_lines = [
+        f"{field_name}: "
+        f"{format_ado_field_value(change['old_value'])} -> "
+        f"{format_ado_field_value(change['new_value'])}"
+        for field_name, change in field_update["fields"].items()
+    ]
+    return (
+        f"Revision: {field_update['revision']}\n"
+        f"Fields updated by: {field_update['changed_by']}\n"
+        f"Changed: {format_ado_timestamp(field_update['changed_date'])}\n\n"
+        "Updated fields:\n"
+        + "\n".join(field_lines)
+    )
+
+
 def _find_jira_comment(jira_comments, marker=None, legacy_text=None):
     for jira_comment in jira_comments:
         body_text = get_jira_comment_text(jira_comment.get("body", {}))
@@ -308,9 +333,6 @@ def run_sync():
             ado_work_item = call_with_retry(
                 work_item_tracking_client.get_work_item, work_item_id
             )
-            work_item_statuses.append(
-                ado_client.get_work_item_status(ado_work_item, work_item_id)
-            )
             for comment in ado_client.get_work_item_comments(
                 work_item_tracking_client,
                 work_item_id,
@@ -404,7 +426,39 @@ def run_sync():
                     )
                     raise
                 if field_update:
-                    work_item_field_updates.append(field_update)
+                    if field_update["fields"]:
+                        work_item_field_updates.append(field_update)
+                    else:
+                        _complete_ledger_event(
+                            work_item["organization_url"],
+                            work_item_id,
+                            "fields",
+                            source_id,
+                            jira_issue_key,
+                            "no_changes",
+                            details={"revision": field_revision},
+                            source_data={"revision": field_revision},
+                        )
+                        _record_decision(
+                            jira_issue_key,
+                            "fields",
+                            "no_changes",
+                            source_org=work_item["organization_url"],
+                            work_item_id=work_item_id,
+                            source_id=source_id,
+                            details={"revision": field_revision},
+                        )
+                    if field_update.get("state_change"):
+                        work_item_statuses.append(
+                            {
+                                "work_item_id": work_item_id,
+                                "state": field_update["state_change"]["new_value"],
+                                "old_state": field_update["state_change"]["old_value"],
+                                "changed_by": field_update["changed_by"],
+                                "changed_date": field_update["changed_date"],
+                                "revision": field_update["revision"],
+                            }
+                        )
                 else:
                     _complete_ledger_event(
                         work_item["organization_url"],
@@ -1103,11 +1157,7 @@ def run_sync():
             f"{marker} {legacy_marker} ADO work item "
             f"{work_item_status['work_item_id']} status"
         )
-        status_body = (
-            f"State: {work_item_status['state']}\n"
-            f"Last changed by: {work_item_status['changed_by']}\n"
-            f"Last changed: {format_ado_timestamp(changed_date)}"
-        )
+        status_body = _format_status_update_body(work_item_status)
         try:
             target_comment, outcome = _post_or_reconcile_comment(
                 jira_issue_key,
@@ -1230,19 +1280,7 @@ def run_sync():
             f"{marker} {legacy_marker} ADO work item "
             f"{field_update['work_item_id']} fields updated"
         )
-        field_lines = [
-            f"{field_name}: "
-            f"{format_ado_field_value(change['old_value'])} -> "
-            f"{format_ado_field_value(change['new_value'])}"
-            for field_name, change in field_update["fields"].items()
-        ]
-        field_body = (
-            f"Revision: {field_update['revision']}\n"
-            f"Changed by: {field_update['changed_by']}\n"
-            f"Changed: {format_ado_timestamp(field_update['changed_date'])}\n\n"
-            "Updated fields:\n"
-            + "\n".join(field_lines)
-        )
+        field_body = _format_field_update_body(field_update)
         try:
             target_comment, outcome = _post_or_reconcile_comment(
                 jira_issue_key,

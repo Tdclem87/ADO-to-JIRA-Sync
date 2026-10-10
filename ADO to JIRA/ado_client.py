@@ -59,6 +59,7 @@ def get_work_item_field_update(organization_url, work_item_id, revision, pat):
     )
     response.raise_for_status()
     update = response.json()
+    state_change = None
     ignored_fields = {
         "System.AuthorizedAs",
         "System.AuthorizedDate",
@@ -74,7 +75,20 @@ def get_work_item_field_update(organization_url, work_item_id, revision, pat):
         "System.Watermark",
     }
     changed_fields = {}
-    for field_name, change in update.get("fields", {}).items():
+    revision_fields = update.get("fields", {})
+    state = revision_fields.get("System.State")
+    if (
+        isinstance(state, dict)
+        and "oldValue" in state
+        and "newValue" in state
+        and state["oldValue"] != state["newValue"]
+    ):
+        state_change = {
+            "old_value": state["oldValue"],
+            "new_value": state["newValue"],
+        }
+
+    for field_name, change in revision_fields.items():
         if (
             field_name in ignored_fields
             or not isinstance(change, dict)
@@ -92,7 +106,7 @@ def get_work_item_field_update(organization_url, work_item_id, revision, pat):
             "new_value": change["newValue"],
         }
 
-    if not changed_fields:
+    if not changed_fields and not state_change:
         return None
 
     changed_by = update.get("revisedBy") or {}
@@ -103,13 +117,16 @@ def get_work_item_field_update(organization_url, work_item_id, revision, pat):
             or changed_by.get("id")
             or "Unknown"
         )
-    return {
+    result = {
         "work_item_id": work_item_id,
         "revision": update.get("rev") or revision,
         "changed_by": changed_by,
         "changed_date": update.get("revisedDate") or "Unknown",
         "fields": changed_fields,
     }
+    if state_change:
+        result["state_change"] = state_change
+    return result
 
 
 def get_work_item_attachments(organization_url, work_item_id, pat):
