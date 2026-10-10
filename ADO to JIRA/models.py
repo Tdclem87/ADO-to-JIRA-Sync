@@ -15,13 +15,16 @@ class AppConfig:
     log_dir: Path
     state_path: Path
     app_version: str
+    failure_mode: str
 
 
 @dataclass
 class RuntimeState:
     config: Optional[AppConfig] = None
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     session: Any = None
+    ledger: Any = None
     run_state: dict[str, Any] = field(default_factory=dict)
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("ado_to_jira_sync")

@@ -40,6 +40,12 @@ python -m pip install -r requirements.txt
 
 The dependency list is stored in `requirements.txt` next to the scripts.
 
+Run the offline regression tests from the repository root with:
+
+```powershell
+python -m unittest discover -s ".\ADO to JIRA\tests"
+```
+
 ## What the sync does
 
 - Reads comments and attachments from Azure DevOps work items.
@@ -50,7 +56,7 @@ The dependency list is stored in `requirements.txt` next to the scripts.
 - Streams attachment downloads and uploads instead of loading entire files into memory.
 - Reuses one HTTP session per run for connection pooling.
 - Stores a clickable Jira link when an attachment exceeds the configured size limit.
-- Avoids reposting matching Jira comments and existing attachment filenames.
+- Avoids reposting matching Jira comments and tracks attachment uploads by ADO source URL, so separate files with the same filename are not conflated.
 - Supports multiple Azure DevOps organizations using configurable Jira prefixes.
 - Writes the retrieved comments to `work_item_comments.csv` for review.
 
@@ -198,11 +204,11 @@ You can also start it from PowerShell or Command Prompt:
 
 The launcher does not contain credentials. Tokens continue to come from Windows environment variables.
 
-The script asks for the Jira issue key, then reads the Jira title/summary and automatically extracts the first standalone number with at least four digits as the ADO work item number. Titles such as `196236 - IRP-PRIO-INC000037757282 - Error message` and `BUG 522880 - MPI Registration` produce ADO IDs `196236` and `522880`; the embedded incident number in the first title is ignored. The console displays the Jira title/summary and the ADO ID it selected before asking `Preview first?`. If no four-or-more-digit number is found, the run stops with an error instead of asking for a replacement ID. After retrieval, it displays the number of comments, attachments, status records, and retrieval failures found. Review that output, then answer `Continue posting to Jira?` with `Y` to upload attachments, add comments, and post status summaries, or `N` to cancel without Jira changes.
+The script asks for the Jira issue key, then reads the Jira title/summary and automatically extracts the first standalone number with at least four digits as the ADO work item number. Titles such as `196236 - IRP-PRIO-INC000037757282 - Error message` and `BUG 522880 - MPI Registration` produce ADO IDs `196236` and `522880`; the embedded incident number in the first title is ignored. The console displays the Jira title/summary and selected ADO ID. If no four-or-more-digit number is found, the run stops instead of asking for a replacement ID. You can choose whether to show additional retrieval logs; the safety preflight is always shown. It identifies the target Jira issue and source organizations, lists the comments, status changes, field values, and attachment URLs/dispositions planned for posting, and warns about oversized, unknown-size, and very large text values. Large comments and field values are sent in full rather than silently truncated; Jira rejection is reported as a failed item. Type `YES` at the final prompt to apply the sync; any other response cancels without Jira changes.
 
 Status comments use a hidden marker containing the work item ID, state, and changed timestamp. This prevents the same status version from being posted repeatedly while allowing a new Jira status comment when the ADO state changes.
 
-Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. HTML field values such as descriptions are converted to readable plain text, and formatting-only changes that render identically are omitted. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update, and a work-item/revision marker prevents duplicate comments. Only the latest revision is checked on each sync run.
+Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. HTML field values such as descriptions are converted to readable plain text, and formatting-only changes that render identically are omitted. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update, and a work-item/revision marker prevents duplicate comments. The first sync checks the latest revision; later runs process new revisions incrementally and retry any revision left pending by a prior failure.
 
 At the Jira issue-key prompt, press `F1` to display this README or `F2` to add an Azure DevOps organization. The `F2` flow asks for a Jira project-key prefix and Azure DevOps organization URL, then saves that mapping to the local `config.json` while retaining the existing Jira account settings. Add the new prefix's PAT to Windows as `AZDO_<PREFIX>_PAT` and restart the launcher so it can read the new environment variable. On non-Windows terminals, enter `F1` or `F2` as text instead of pressing the function key.
 
@@ -226,9 +232,11 @@ Each script writes activity and error information to a local `logs` folder next 
 
 Logs include setup events, retrieval counts, preview and cancellation decisions, upload/post results, and error details. Tokens, PAT values, and other credential values are never written to the logs. The `logs` folder is ignored by Git and should remain local.
 
-Each script invocation also receives a short session ID. Every log entry includes that ID, making it possible to isolate one run when several runs are present in the same daily log file.
+Each script invocation also receives a short session ID and a run ID. Activity log lines include those IDs plus the Jira issue key, source organization, and ADO work-item IDs once known, making it possible to correlate the daily log with the ledger and JSON audit export.
 
-The script also keeps a local `run_state.json` file with the latest session status, target issue, work-item IDs, preview choice, counts, and outcome. It contains no credentials, is updated atomically, and is ignored by Git. A `running` status after an interruption indicates that the previous session did not finish normally.
+The script keeps a local `run_state.json` with the latest status, target issue, work-item IDs, counts, and failures. A run with handled item failures ends as `completed_with_errors`; a `running` status after an interruption means the previous session did not finish normally. A local SQLite `sync_ledger.sqlite3` records source snapshots, event statuses, and target Jira IDs for replay-safe runs. Each run also exports decisions and an attachment source-URL-to-Jira-target mapping as `audit/sync-<run-id>.json`. These files contain synced work-item content and URLs, so keep the ignored runtime data local and access-controlled.
+
+Set `failure_mode` in `config.json` to `continue` (the default) to record an item failure and continue, or `stop` to stop after the first item failure. Handled failures and reasons appear in the console summary, run state, and audit export. Shared HTTP-session requests and Azure DevOps SDK work-item reads retry transient 429/5xx responses; Jira writes use bounded retries and reconcile uncertain results before retrying.
 
 ## Security guidance
 
@@ -236,7 +244,7 @@ The script also keeps a local `run_state.json` file with the latest session stat
 - Never commit PATs, API tokens, `.env` files, or generated CSV exports.
 - Keep the public repo limited to safe shareable files.
 - Rotate any credential that may have been exposed.
-- Review the preview and destination Jira issue before answering `Continue posting to Jira?` with `Y`.
+- Review the preflight and destination Jira issue before typing `YES` to apply the sync.
 
 ## Updating the app
 

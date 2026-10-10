@@ -1,4 +1,5 @@
 import tempfile
+import time
 from pathlib import Path
 
 import requests
@@ -6,6 +7,56 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from models import RUNTIME
 from transforms import get_attachment_filename, get_jira_comment_text, jira_text_nodes
+
+
+def _post_with_rate_limit_retry(url, data_factory=None, **kwargs):
+    for attempt in range(4):
+        if data_factory:
+            data = data_factory()
+            kwargs["data"] = data
+            kwargs["headers"] = {
+                **kwargs.get("headers", {}),
+                "Content-Type": data.content_type,
+            }
+        response = RUNTIME.session.post(url, **kwargs)
+        if response.status_code != 429 or attempt == 3:
+            return response
+        retry_after = response.headers.get("Retry-After")
+        response.close()
+        try:
+            delay = (
+                min(max(float(retry_after), 0), 30)
+                if retry_after
+                else 0.5 * (2**attempt)
+            )
+        except (TypeError, ValueError):
+            delay = 0.5 * (2**attempt)
+        time.sleep(delay)
+
+
+def get_attachment_size(attachment, pat):
+    response = RUNTIME.session.head(
+        attachment["url"],
+        auth=("", pat),
+        allow_redirects=True,
+        timeout=30,
+    )
+    if response.status_code in {405, 501}:
+        response.close()
+        response = RUNTIME.session.get(
+            attachment["url"],
+            auth=("", pat),
+            stream=True,
+            timeout=30,
+        )
+    try:
+        response.raise_for_status()
+        try:
+            return int(response.headers.get("Content-Length", ""))
+        except ValueError:
+            return None
+    finally:
+        response.close()
 
 
 def get_jira_issue_data(issue_key, jira_api_token):
@@ -26,13 +77,27 @@ def get_jira_issue_data(issue_key, jira_api_token):
     )
 
 
+def _find_new_jira_attachment(
+    issue_key, filename, jira_api_token, known_attachment_ids
+):
+    _, attachments, _ = get_jira_issue_data(issue_key, jira_api_token)
+    existing = next(
+        (
+            attachment
+            for attachment in attachments
+            if attachment.get("filename") == filename
+            and attachment.get("id") not in known_attachment_ids
+        ),
+        None,
+    )
+    return {**existing, "_reconciled": True} if existing else None
+
+
 def upload_jira_attachment(
-    issue_key, attachment, pat, jira_api_token, existing_filenames
+    issue_key, attachment, pat, jira_api_token, known_attachment_ids
 ):
     config = RUNTIME.config
     filename = get_attachment_filename(attachment)
-    if filename in existing_filenames:
-        return None, f"Skipped existing Jira attachment: {filename}", None
 
     temporary_path = None
     try:
@@ -73,22 +138,69 @@ def upload_jira_attachment(
             )
 
         with open(temporary_path, "rb") as attachment_file:
-            encoder = MultipartEncoder(
-                fields={"file": (filename, attachment_file, content_type)}
-            )
-            upload_response = RUNTIME.session.post(
-                f"{config.jira_base_url}/rest/api/3/issue/{issue_key}/attachments",
-                auth=(config.jira_email, jira_api_token),
-                headers={
-                    "X-Atlassian-Token": "no-check",
-                    "Content-Type": encoder.content_type,
-                },
-                data=encoder,
-                timeout=30,
-            )
-            upload_response.raise_for_status()
-        uploaded_attachment = upload_response.json()[0]
-        existing_filenames.add(filename)
+            for attempt in range(4):
+                def create_encoder():
+                    attachment_file.seek(0)
+                    return MultipartEncoder(
+                        fields={"file": (filename, attachment_file, content_type)}
+                    )
+
+                try:
+                    upload_response = _post_with_rate_limit_retry(
+                        f"{config.jira_base_url}/rest/api/3/issue/{issue_key}/attachments",
+                        data_factory=create_encoder,
+                        auth=(config.jira_email, jira_api_token),
+                        headers={"X-Atlassian-Token": "no-check"},
+                        timeout=30,
+                    )
+                    if 500 <= upload_response.status_code < 600:
+                        upload_response.close()
+                        time.sleep(min(0.5 * (2**attempt), 8))
+                        existing = _find_new_jira_attachment(
+                            issue_key,
+                            filename,
+                            jira_api_token,
+                            known_attachment_ids,
+                        )
+                        if existing:
+                            known_attachment_ids.add(existing.get("id"))
+                            return (
+                                existing,
+                                f"Reconciled existing Jira attachment: {filename}",
+                                None,
+                            )
+                        if attempt == 3:
+                            upload_response.raise_for_status()
+                        continue
+                    upload_response.raise_for_status()
+                    uploaded_attachment = upload_response.json()[0]
+                    break
+                except requests.RequestException as error:
+                    response = error.response
+                    if response is not None and response.status_code < 500:
+                        raise
+                    time.sleep(min(0.5 * (2**attempt), 8))
+                    try:
+                        existing = _find_new_jira_attachment(
+                            issue_key,
+                            filename,
+                            jira_api_token,
+                            known_attachment_ids,
+                        )
+                    except requests.RequestException:
+                        raise error
+                    if existing:
+                        known_attachment_ids.add(existing.get("id"))
+                        return (
+                            existing,
+                            f"Reconciled existing Jira attachment: {filename}",
+                            None,
+                        )
+                    if attempt == 3:
+                        raise
+            else:
+                raise RuntimeError(f"Attachment upload did not complete: {filename}")
+        known_attachment_ids.add(uploaded_attachment.get("id"))
         return uploaded_attachment, f"Uploaded attachment: {filename}", None
     finally:
         if temporary_path:
@@ -144,7 +256,7 @@ def add_jira_comment(
                     ],
                 }
             )
-    response = RUNTIME.session.post(
+    response = _post_with_rate_limit_retry(
         f"{config.jira_base_url}/rest/api/3/issue/{issue_key}/comment",
         auth=(config.jira_email, jira_api_token),
         headers={"Accept": "application/json", "Content-Type": "application/json"},

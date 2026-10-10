@@ -16,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.json"
 LOG_DIR = BASE_DIR / "logs"
 STATE_PATH = BASE_DIR / "run_state.json"
+LEDGER_PATH = BASE_DIR / "sync_ledger.sqlite3"
+AUDIT_DIR = BASE_DIR / "audit"
 VERSION_PATHS = (BASE_DIR / "VERSION", BASE_DIR.parent / "VERSION")
 APP_VERSION = next(
     (path.read_text(encoding="utf-8").strip() for path in VERSION_PATHS if path.is_file()),
@@ -27,6 +29,12 @@ DEFAULT_MAX_ATTACHMENT_SIZE_MB = 100
 class SessionLogFilter(logging.Filter):
     def filter(self, record):
         record.session_id = RUNTIME.session_id
+        record.run_id = RUNTIME.run_id
+        record.jira_issue_key = RUNTIME.run_state.get("jira_issue_key", "-")
+        record.source_orgs = ",".join(RUNTIME.run_state.get("source_orgs", [])) or "-"
+        record.work_item_ids = ",".join(
+            str(item) for item in RUNTIME.run_state.get("work_item_ids", [])
+        ) or "-"
         return True
 
 
@@ -40,6 +48,7 @@ def update_run_state(status, **updates):
         {
             "status": status,
             "session_id": RUNTIME.session_id,
+            "run_id": RUNTIME.run_id,
             "updated_at": datetime.now(timezone.utc).isoformat(),
             **updates,
         }
@@ -66,7 +75,9 @@ def configure_logging():
     )
     handler.setFormatter(
         logging.Formatter(
-            "%(asctime)s [%(levelname)s] [session=%(session_id)s] %(message)s"
+            "%(asctime)s [%(levelname)s] [session=%(session_id)s] "
+            "[run=%(run_id)s] [jira=%(jira_issue_key)s] "
+            "[orgs=%(source_orgs)s] [items=%(work_item_ids)s] %(message)s"
         )
     )
     handler.addFilter(SessionLogFilter())
@@ -116,12 +127,15 @@ def load_configuration():
         max_attachment_size_mb = configuration.get(
             "max_attachment_size_mb", DEFAULT_MAX_ATTACHMENT_SIZE_MB
         )
+        failure_mode = configuration.get("failure_mode", "continue")
         if (
             not isinstance(max_attachment_size_mb, (int, float))
             or max_attachment_size_mb <= 0
         ):
             raise ValueError("max_attachment_size_mb must be greater than 0.")
         max_attachment_bytes = int(max_attachment_size_mb * 1024 * 1024)
+        if failure_mode not in {"continue", "stop"}:
+            raise ValueError("failure_mode must be 'continue' or 'stop'.")
     except (KeyError, TypeError, AttributeError) as error:
         raise RuntimeError(
             "Configuration must include ado_configs and jira settings."
@@ -138,6 +152,7 @@ def load_configuration():
         log_dir=LOG_DIR,
         state_path=STATE_PATH,
         app_version=APP_VERSION,
+        failure_mode=failure_mode,
     )
     RUNTIME.logger.info(
         "Loaded configuration for %d Azure DevOps organization(s).",
@@ -152,6 +167,16 @@ def view_readme():
         return
 
     print("\n" + readme_path.read_text(encoding="utf-8"))
+    input("Press Enter to continue...")
+
+
+def view_changelog():
+    changelog_path = BASE_DIR.parent / "CHANGELOG.md"
+    if not changelog_path.exists():
+        print(f"Changelog not found: {changelog_path}")
+        return
+
+    print("\n" + changelog_path.read_text(encoding="utf-8"))
     input("Press Enter to continue...")
 
 
@@ -173,6 +198,9 @@ def read_jira_issue_key_or_function_key(prompt):
             if scan_code == 60:
                 print()
                 return "F2"
+            if scan_code == 61:
+                print()
+                return "F3"
             continue
         if character in {"\r", "\n"}:
             print()
@@ -242,13 +270,16 @@ def get_jira_issue_key():
             sorted(prefix.upper() for prefix in RUNTIME.config.ado_configs.keys())
         )
         value = read_jira_issue_key_or_function_key(
-            f"Jira issue key ({valid_prefixes}; F1 README; F2 add organization): "
+            f"Jira issue key ({valid_prefixes}; F1 README; F2 add organization; F3 changelog): "
         )
         if value.upper() == "F1":
             view_readme()
             continue
         if value.upper() == "F2":
             add_organization_configuration()
+            continue
+        if value.upper() == "F3":
+            view_changelog()
             continue
         if not value:
             print("A Jira issue key is required.")
