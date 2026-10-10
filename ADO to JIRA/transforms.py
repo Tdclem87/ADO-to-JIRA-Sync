@@ -148,6 +148,11 @@ def format_ado_field_value(value):
     return text
 
 
+def format_ado_field_name(field_name):
+    label = field_name.rsplit(".", 1)[-1].replace("_", " ")
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", label)
+
+
 def extract_ado_work_item_ids(summary):
     match = re.search(r"(?<!\d)\d{4,}(?!\d)", summary or "")
     if not match:

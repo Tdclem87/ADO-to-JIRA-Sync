@@ -25,6 +25,7 @@ from transforms import (
     comment_timestamp_sort_key,
     extract_ado_work_item_ids,
     format_ado_field_value,
+    format_ado_field_name,
     format_ado_timestamp,
     get_comment_attachment_urls,
     get_comment_author,
@@ -142,7 +143,7 @@ def _format_status_update_body(status_update):
 
 def _format_field_update_body(field_update):
     field_lines = [
-        f"{field_name}: "
+        f"{format_ado_field_name(field_name)}: "
         f"{format_ado_field_value(change['old_value'])} -> "
         f"{format_ado_field_value(change['new_value'])}"
         for field_name, change in field_update["fields"].items()

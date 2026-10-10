@@ -119,7 +119,13 @@ class SyncLedgerTests(unittest.TestCase):
                 "Microsoft.VSTS.Common.AcceptanceCriteria": {
                     "oldValue": "<p>old</p>",
                     "newValue": "<p>new</p>",
-                }
+                },
+                "Custom.RootCause": {"oldValue": None, "newValue": "Data issue"},
+                "Custom.RootCauseDescription": {
+                    "oldValue": "Previous explanation",
+                    "newValue": "Updated explanation",
+                },
+                "Custom.Priority": {"oldValue": "3", "newValue": "2"},
             },
         }
         with patch.object(sync_service.RUNTIME, "session") as session:
@@ -133,7 +139,13 @@ class SyncLedgerTests(unittest.TestCase):
         self.assertNotIn("state_change", update)
         body = sync_service._format_field_update_body(update)
         self.assertIn("Fields updated by: Caleb Irving", body)
-        self.assertIn("AcceptanceCriteria: old -> new", body)
+        self.assertIn("Acceptance Criteria: old -> new", body)
+        self.assertIn("Root Cause: (empty) -> Data issue", body)
+        self.assertIn(
+            "Root Cause Description: Previous explanation -> Updated explanation",
+            body,
+        )
+        self.assertIn("Priority: 3 -> 2", body)
 
     def test_state_change_is_taken_from_revision_with_its_author(self):
         mock_response = Mock()
