@@ -32,13 +32,9 @@ Keep the local working script and local config file off Git. The public repo sho
 - One Jira API token
 - One Azure DevOps PAT per configured organization prefix
 
-## Install dependencies
+## Install
 
-```powershell
-python -m pip install -r ".\ADO to JIRA\requirements.txt"
-```
-
-The dependency list is stored in `requirements.txt` next to the scripts.
+On Windows, double-click [`Run ADO to Jira Sync.cmd`](./ADO%20to%20JIRA/Run%20ADO%20to%20Jira%20Sync.cmd). The launcher creates a local Python environment, checks for pip updates at startup, and installs the required packages automatically on first start or when `requirements.txt` changes. If the pip update check fails, the launcher warns and continues; a failed requirements install is retried at the next start. You do not need to run a package-install command. Python 3.9 or newer must be installed.
 
 Run the offline regression tests from the repository root with:
 
@@ -52,11 +48,11 @@ python -m unittest discover -s ".\ADO to JIRA\tests"
 - Posts each work item's current state, last changed-by identity, and last changed timestamp into a Jira status comment.
 - Posts a separate Jira comment with before-and-after values when non-status fields change in the latest Azure DevOps revision.
 - Converts HTML comment content into readable Jira text.
-- Uploads work item attachments and comment-linked screenshots to Jira.
+- Uploads work item attachments and comment-linked screenshots to Jira using ADO's original filenames when available, adding an extension from the response content type when needed.
 - Streams attachment downloads and uploads instead of loading entire files into memory.
 - Reuses one HTTP session per run for connection pooling.
 - Stores a clickable Jira link when an attachment exceeds the configured size limit.
-- Avoids reposting matching Jira comments and tracks attachment uploads by ADO source URL, so separate files with the same filename are not conflated.
+- Avoids duplicate posts, reimports ADO comments still present in ADO but missing from Jira, and checks recorded Jira IDs to restore deleted status/field comments. Attachment uploads are tracked by ADO source URL, so separate files with the same filename are not conflated.
 - Supports multiple Azure DevOps organizations using configurable Jira prefixes.
 - Writes the retrieved comments to `work_item_comments.csv` for review.
 
@@ -68,11 +64,15 @@ The current version is stored in the repository-root `VERSION` file and is shown
 
 When you run the script for the first time, it will detect whether a configuration file is missing and prompt you to set it up.
 
-The script asks for:
+The script asks for the following organization information repeatedly, without asking for an organization count:
 
-- how many Azure DevOps organizations you want to configure
-- the Jira prefix for each organization, such as `MBSD` or `ONSD`
+- the Jira project-key prefix for each organization, such as `MBSD` or `ONSD`
 - the Azure DevOps URL for each organization
+
+Press `F4` after entering the last organization to continue to the Jira settings. On non-Windows terminals, enter `F4` as text.
+
+The script then asks for:
+
 - the Jira base URL
 - the Jira email address
 
@@ -183,14 +183,17 @@ From the folder containing the script:
 python clean_ado_to_jira_sync.py
 ```
 
+This direct command assumes its Python environment already has the packages listed in `requirements.txt`. For normal Windows use, launch with `Run ADO to Jira Sync.cmd` so the environment and packages are set up automatically.
+
 ### Use the automatic Windows launcher
 
 Double-click `Run ADO to Jira Sync.cmd` to launch the application. The launcher checks for updates automatically before the first sync run when Windows PowerShell is available, and falls back to a Command Prompt loop if it is not. The fallback displays that it skipped the update check. It:
 
 - uses `powershell.exe` when it is available
 - fast-forwards the current Git branch when updates are available and tracked files have no local edits
-- refreshes Python dependencies only when `requirements.txt` changes or a previous dependency install did not complete
-- prefers the repository virtual environment at `.venv\Scripts\python.exe` when available
+- attempts to update pip at startup and warns if that optional update fails
+- creates and uses the repository virtual environment at `.venv\Scripts\python.exe`
+- installs requirements automatically on first use, after a requirements change, or after an incomplete install
 - uses the shared `clean_ado_to_jira_sync.py` script
 - keeps the console open after each run
 - automatically starts the first prompt again after the run finishes
@@ -204,13 +207,15 @@ You can also start it from PowerShell or Command Prompt:
 
 The launcher does not contain credentials. Tokens continue to come from Windows environment variables.
 
-The script asks for the Jira issue key, then reads the Jira title/summary and automatically extracts the first standalone number with at least four digits as the ADO work item number. Titles such as `196236 - IRP-PRIO-INC000037757282 - Error message` and `BUG 522880 - MPI Registration` produce ADO IDs `196236` and `522880`; the embedded incident number in the first title is ignored. The console displays the Jira title/summary and selected ADO ID. If no four-or-more-digit number is found, the run stops instead of asking for a replacement ID. You can choose whether to show additional retrieval logs; the safety preflight is always shown. It identifies the target Jira issue and source organizations, lists the comments, status changes, field values, and attachment URLs/dispositions planned for posting, and warns about oversized, unknown-size, and very large text values. Large comments and field values are sent in full rather than silently truncated; Jira rejection is reported as a failed item. Type `YES` at the final prompt to apply the sync; any other response cancels without Jira changes.
+After you enter a Jira issue key, the script automatically loads and displays the Jira title/summary and selected ADO work item ID. It extracts the first standalone number with at least four digits; for example, `196236 - IRP-PRIO-INC000037757282 - Error message` and `BUG 522880 - MPI Registration` produce ADO IDs `196236` and `522880`, while the embedded incident number is ignored. If no four-or-more-digit number is found, the run stops instead of asking for a replacement ID. Detailed retrieval logs and the safety preflight are always shown. The preflight identifies the target Jira issue and source organizations, lists the comments, status changes, field values, and attachment URLs/dispositions planned for posting, and warns about oversized, unknown-size, and very large text values. Large comments and field values are sent in full rather than silently truncated; Jira rejection is reported as a failed item. The script then asks whether to post the planned updates to Jira; answer `y`/`yes` to continue or `n`/anything else to cancel without Jira changes.
 
-Status comments use a hidden marker containing the work item ID, state, and changed timestamp. This prevents the same status version from being posted repeatedly while allowing a new Jira status comment when the ADO state changes.
+Generated Jira comments use clear headings, regular-weight details, and a muted sync-reference footer instead of bracketed IDs. The footer supports retry reconciliation; older comments with bracketed markers are still recognized. Status and field-update comments identify the ADO work item and revision in their visible details.
 
-Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. HTML field values such as descriptions are converted to readable plain text, and formatting-only changes that render identically are omitted. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update, and a work-item/revision marker prevents duplicate comments. The first sync checks the latest revision; later runs process new revisions incrementally and retry any revision left pending by a prior failure.
+Non-status field update comments include the Azure DevOps field names, previous and new values, revision, and editor. HTML field values such as descriptions are converted to readable plain text, and formatting-only changes that render identically are omitted. State and audit-only fields are omitted because status comments already cover state changes. The initial work item creation revision is not treated as a field update. The first sync checks the latest revision; later runs process new revisions incrementally and retry any revision left pending by a prior failure.
 
 At the Jira issue-key prompt, press `F1` to display this README, `F2` to add an Azure DevOps organization, or `F3` to display the changelog. The `F2` flow asks for a Jira project-key prefix and Azure DevOps organization URL, then saves that mapping to the local `config.json` while retaining the existing Jira account settings. Add the new prefix's PAT to Windows as `AZDO_<PREFIX>_PAT` and restart the launcher so it can read the new environment variable. On non-Windows terminals, enter `F1`, `F2`, or `F3` as text instead of pressing the function key.
+
+During first-time setup, enter each organization's project-key prefix and URL in turn; there is no organization-count prompt. Press `F4` after the last organization to continue to the Jira settings. On non-Windows terminals, enter `F4` as text.
 
 ## Screenshots
 
@@ -218,9 +223,9 @@ These sanitized captures show the current version and workflow:
 
 ![Current Jira issue prompt with F1, F2, and F3 actions](screenshots/latest-jira-issue-prompt.svg)
 
-![Current sync preview with explicit confirmation and summary](screenshots/latest-sync-preview.svg)
+![Current sync preview with automatic summary and post confirmation](screenshots/latest-sync-preview.svg)
 
-![Formatted Jira field-update comment with replay marker](screenshots/latest-field-update-comment.svg)
+![Formatted Jira field-update comment with a muted sync-reference footer](screenshots/latest-field-update-comment.svg)
 
 Setup and environment-variable examples are indexed in [screenshots/README.md](screenshots/README.md).
 
@@ -244,7 +249,7 @@ Set `failure_mode` in `config.json` to `continue` (the default) to record an ite
 - Never commit PATs, API tokens, `.env` files, or generated CSV exports.
 - Keep the public repo limited to safe shareable files.
 - Rotate any credential that may have been exposed.
-- Review the preflight and destination Jira issue before typing `YES` to apply the sync.
+- Review the preflight and destination Jira issue before answering `y` or `yes` to post the sync.
 
 ## Updating the app
 
@@ -252,6 +257,6 @@ When you start `Run ADO to Jira Sync.cmd`, it checks for updates before showing 
 
 The updater uses Git to fast-forward the current branch. It will not update if tracked files have local edits, and it never resets or stashes files. Resolve or commit those edits, then start the launcher again. Ignored configuration, logs, run state, and generated CSV files are not replaced.
 
-The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. Dependencies are installed when `requirements.txt` changes or a previous install did not finish successfully. The updater uses the repository `.venv` when present, or the available Python installation otherwise; a failed install is retried at the next launcher start.
+The launcher runs the shared `clean_ado_to_jira_sync.py` file, so updates apply to everyone rather than being shadowed by a private `ado_to_jira_sync.py` copy. It creates `.venv`, attempts to update pip at each start, and installs dependencies independently of Git, so a downloaded source folder can still install its packages automatically. The PowerShell launcher refreshes requirements when they change or a previous install did not complete; the Command Prompt fallback checks requirements at each start. A failed requirements install is retried at the next launcher start.
 
-Git is required for update checks. If the check fails, the launcher displays a warning and continues with the current files. If Windows PowerShell is unavailable, the Command Prompt fallback displays that it skipped the update check. Python is needed when dependencies must be installed and to run the sync.
+Git is required for update checks. If the check fails, the launcher displays a warning and continues with the current files. If Windows PowerShell is unavailable, the Command Prompt fallback displays that it skipped the update check and installs requirements automatically. Python is needed to create the app environment and run the sync.

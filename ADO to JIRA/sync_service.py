@@ -30,6 +30,7 @@ from transforms import (
     get_comment_attachment_urls,
     get_comment_author,
     get_jira_comment_text,
+    jira_comment_matching_text,
     remove_html_formatting,
 )
 
@@ -39,7 +40,9 @@ PREFLIGHT_TEXT_WARNING_CHARS = 30000
 
 
 def _confirm_sync(jira_issue_key):
-    response = input(f"Type Y/N to apply this sync to {jira_issue_key}: ").strip().lower()
+    response = input(
+        f"Post the planned updates to Jira issue {jira_issue_key}? (y/n): "
+    ).strip().lower()
     return response in {"y", "yes"}
 
 
@@ -157,8 +160,7 @@ def _format_field_update_body(field_update):
         for field_name, change in field_update["fields"].items()
     ]
     return (
-        f"Revision: {field_update['revision']}\n"
-        f"Fields updated by: {field_update['changed_by']}\n"
+        f"Changed by: {field_update['changed_by']}\n"
         f"Changed: {format_ado_timestamp(field_update['changed_date'])}\n\n"
         "Updated fields:\n"
         + "\n".join(field_lines)
@@ -177,14 +179,35 @@ def _latest_state_updates(status_updates):
     return list(latest_by_work_item.values())
 
 
+def _comment_text_has_marker(body_text, marker):
+    if not marker:
+        return False
+    footer_marker = marker.strip("[]")
+    return marker in body_text or bool(
+        footer_marker and footer_marker in body_text
+    )
+
+
 def _find_jira_comment(jira_comments, marker=None, legacy_text=None):
+    legacy_texts = (
+        [legacy_text] if isinstance(legacy_text, str) else legacy_text or []
+    )
     for jira_comment in jira_comments:
         body_text = get_jira_comment_text(jira_comment.get("body", {}))
-        if marker and marker in body_text:
+        if _comment_text_has_marker(body_text, marker):
             return jira_comment
-        if legacy_text and legacy_text in body_text:
+        if any(text and text in body_text for text in legacy_texts):
             return jira_comment
     return None
+
+
+def _ledger_comment_is_present(event, jira_comment_ids):
+    return bool(
+        event
+        and event.get("status") in {"posted", "reconciled", "existing"}
+        and event.get("target_id")
+        and str(event["target_id"]) in jira_comment_ids
+    )
 
 
 def _post_or_reconcile_comment(
@@ -199,7 +222,12 @@ def _post_or_reconcile_comment(
     for attempt in range(4):
         try:
             created = jira_client.add_jira_comment(
-                jira_issue_key, header, body, attachment_links, jira_api_token
+                jira_issue_key,
+                header,
+                body,
+                attachment_links,
+                jira_api_token,
+                sync_marker=marker,
             )
             return created, "posted"
         except requests.RequestException as error:
@@ -298,6 +326,9 @@ def run_sync():
     except requests.RequestException as error:
         raise RuntimeError(f"Could not read Jira issue {jira_issue_key}: {error}") from error
 
+    jira_comment_ids = {
+        str(comment["id"]) for comment in jira_comments if comment.get("id")
+    }
     work_item_inputs = extract_ado_work_item_ids(jira_summary)
     LOGGER.info(
         "Found ADO work item ID(s) in Jira summary '%s': %s",
@@ -330,10 +361,7 @@ def run_sync():
                 "pat": get_required_environment_variable(pat_env_var),
             }
         )
-    preview_first = (
-        input("Show detailed retrieval logs? (y/n): ").strip().lower()
-        in {"y", "yes"}
-    )
+    preview_first = True
     update_run_state("running", preview_first=preview_first)
 
     comments = []
@@ -385,11 +413,47 @@ def run_sync():
             revision = getattr(ado_work_item, "rev", None)
             if revision is None:
                 revision = (getattr(ado_work_item, "fields", {}) or {}).get("System.Rev")
+            latest_revision = int(revision or 0)
+            missing_comment_events = RUNTIME.ledger.get_comment_events_with_missing_targets(
+                work_item["organization_url"],
+                work_item_id,
+                jira_issue_key,
+                jira_comment_ids,
+            )
+            missing_field_revisions = set()
+            for missing_event in missing_comment_events:
+                if missing_event["event_type"] == "fields":
+                    try:
+                        field_revision = int(missing_event["source_id"])
+                    except (TypeError, ValueError):
+                        LOGGER.warning(
+                            "Cannot recheck missing Jira field-update comment for "
+                            "unrecognized ADO revision %s.",
+                            missing_event["source_id"],
+                        )
+                        continue
+                    if field_revision <= latest_revision:
+                        missing_field_revisions.add(field_revision)
+                elif missing_event["event_type"] == "state":
+                    status_update = missing_event["details"].get("source")
+                    if isinstance(status_update, dict):
+                        work_item_statuses.append(
+                            {**status_update, "work_item_id": work_item_id}
+                        )
+                    else:
+                        LOGGER.warning(
+                            "Cannot restore deleted Jira status comment for ADO item %s; "
+                            "the ledger has no source snapshot.",
+                            work_item_id,
+                        )
             revisions_to_check = RUNTIME.ledger.get_field_revisions_to_check(
                 work_item["organization_url"],
                 work_item_id,
                 jira_issue_key,
                 revision,
+            )
+            revisions_to_check = sorted(
+                set(revisions_to_check) | missing_field_revisions
             )
             for field_revision in revisions_to_check:
                 source_id = str(field_revision)
@@ -405,7 +469,10 @@ def run_sync():
                     "reconciled",
                     "existing",
                     "no_changes",
-                }:
+                } and (
+                    event["status"] == "no_changes"
+                    or _ledger_comment_is_present(event, jira_comment_ids)
+                ):
                     field_skipped_count += 1
                     _record_decision(
                         jira_issue_key,
@@ -669,8 +736,11 @@ def run_sync():
             "state", work_item["organization_url"], item["work_item_id"], source_id
         )
         if not (
-            (event and event["status"] in {"posted", "reconciled", "existing"})
-            or any(marker in text for text in existing_comment_text)
+            _ledger_comment_is_present(event, jira_comment_ids)
+            or any(
+                _comment_text_has_marker(text, marker)
+                for text in existing_comment_text
+            )
         ):
             states_to_post += 1
             states_preview.append(item)
@@ -691,8 +761,11 @@ def run_sync():
             "fields", work_item["organization_url"], item["work_item_id"], source_id
         )
         if not (
-            (event and event["status"] in {"posted", "reconciled", "existing"})
-            or any(marker in text for text in existing_comment_text)
+            _ledger_comment_is_present(event, jira_comment_ids)
+            or any(
+                _comment_text_has_marker(text, marker)
+                for text in existing_comment_text
+            )
         ):
             fields_to_post += 1
             fields_preview.append(item)
@@ -962,7 +1035,11 @@ def run_sync():
             f"Comment Created by: {comment['CommentCreatedBy']}\n"
             f"Date Created: {format_ado_timestamp(comment['CommentCreatedDate'])}"
         )
-        comment_header = f"{marker} {legacy_header}"
+        comment_header = (
+            "Azure DevOps comment\n"
+            f"Created by: {comment['CommentCreatedBy']}\n"
+            f"Created: {format_ado_timestamp(comment['CommentCreatedDate'])}"
+        )
         event = _get_ledger_event(
             source_org,
             comment["WorkItemId"],
@@ -983,7 +1060,10 @@ def run_sync():
             for item in comment_attachments
             if item["url"] in fallback_links
         )
-        legacy_text = legacy_header + comment["PlainText"]
+        legacy_text = [
+            jira_comment_matching_text(comment_header, comment["PlainText"]),
+            legacy_header + comment["PlainText"],
+        ]
         existing_jira_comment = _find_jira_comment(
             jira_comments, marker=marker, legacy_text=legacy_text
         )
@@ -1130,12 +1210,22 @@ def run_sync():
             source_id,
             jira_issue_key,
         )
+        status_header = (
+            "Azure DevOps status update\n"
+            f"Work item: {work_item_status['work_item_id']}\n"
+            f"Revision: {work_item_status['revision']}"
+        )
+        status_body = _format_status_update_body(work_item_status)
+        legacy_text = [
+            jira_comment_matching_text(status_header, status_body),
+            legacy_marker,
+        ]
         existing_status = _find_jira_comment(
-            jira_comments, marker=marker, legacy_text=legacy_marker
+            jira_comments, marker=marker, legacy_text=legacy_text
         )
         if (
             status_identity in seen_status_markers
-            or (event and event["status"] in {"posted", "reconciled", "existing"})
+            or _ledger_comment_is_present(event, jira_comment_ids)
             or existing_status
         ):
             status_skipped_count += 1
@@ -1163,11 +1253,6 @@ def run_sync():
                 details={"state": work_item_status["state"], "changed_date": changed_date},
             )
             continue
-        status_header = (
-            f"{marker} {legacy_marker} ADO work item "
-            f"{work_item_status['work_item_id']} status"
-        )
-        status_body = _format_status_update_body(work_item_status)
         try:
             target_comment, outcome = _post_or_reconcile_comment(
                 jira_issue_key,
@@ -1176,7 +1261,7 @@ def run_sync():
                 [],
                 jira_api_token,
                 marker,
-                legacy_marker,
+                legacy_text,
             )
             status_posted_count += 1
             seen_status_markers.add(status_identity)
@@ -1252,12 +1337,22 @@ def run_sync():
             source_id,
             jira_issue_key,
         )
+        field_header = (
+            "Azure DevOps field update\n"
+            f"Work item: {field_update['work_item_id']}\n"
+            f"Revision: {field_update['revision']}"
+        )
+        field_body = _format_field_update_body(field_update)
+        legacy_text = [
+            jira_comment_matching_text(field_header, field_body),
+            legacy_marker,
+        ]
         existing_update = _find_jira_comment(
-            jira_comments, marker=marker, legacy_text=legacy_marker
+            jira_comments, marker=marker, legacy_text=legacy_text
         )
         if (
             field_identity in seen_field_update_markers
-            or (event and event["status"] in {"posted", "reconciled", "existing"})
+            or _ledger_comment_is_present(event, jira_comment_ids)
             or existing_update
         ):
             field_skipped_count += 1
@@ -1286,11 +1381,6 @@ def run_sync():
             )
             continue
 
-        field_header = (
-            f"{marker} {legacy_marker} ADO work item "
-            f"{field_update['work_item_id']} fields updated"
-        )
-        field_body = _format_field_update_body(field_update)
         try:
             target_comment, outcome = _post_or_reconcile_comment(
                 jira_issue_key,
@@ -1299,7 +1389,7 @@ def run_sync():
                 [],
                 jira_api_token,
                 marker,
-                legacy_marker,
+                legacy_text,
             )
             field_update_posted_count += 1
             seen_field_update_markers.add(field_identity)
@@ -1356,7 +1446,8 @@ def run_sync():
 
     linked_attachment_count = 0
     if fallback_links:
-        link_header = "[ADO_TO_JIRA_LINKS] Attachments not uploaded"
+        link_header = "Attachments not uploaded"
+        legacy_link_header = "[ADO_TO_JIRA_LINKS] Attachments not uploaded"
         link_body = (
             "These Azure DevOps attachments exceeded the configured upload limit "
             "and were stored as links instead."
@@ -1365,15 +1456,19 @@ def run_sync():
         fallback_marker = _event_marker(
             "links", jira_issue_key, 0, fallback_source_id
         )
+        legacy_text = [
+            jira_comment_matching_text(link_header, link_body),
+            legacy_link_header + link_body,
+        ]
         try:
             target_comment, outcome = _post_or_reconcile_comment(
                 jira_issue_key,
-                f"{fallback_marker} {link_header}",
+                link_header,
                 link_body,
                 list(fallback_links.values()),
                 jira_api_token,
                 fallback_marker,
-                link_header + link_body,
+                legacy_text,
             )
             target_id = target_comment.get("id") if target_comment else None
             existing_comment_text.add(fallback_marker)

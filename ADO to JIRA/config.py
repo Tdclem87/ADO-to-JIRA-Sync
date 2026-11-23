@@ -180,7 +180,7 @@ def view_changelog():
     input("Press Enter to continue...")
 
 
-def read_jira_issue_key_or_function_key(prompt):
+def read_console_input_or_function_key(prompt):
     if os.name != "nt":
         return input(prompt).strip()
 
@@ -201,6 +201,9 @@ def read_jira_issue_key_or_function_key(prompt):
             if scan_code == 61:
                 print()
                 return "F3"
+            if scan_code == 62:
+                print()
+                return "F4"
             continue
         if character in {"\r", "\n"}:
             print()
@@ -269,7 +272,7 @@ def get_jira_issue_key():
         valid_prefixes = " / ".join(
             sorted(prefix.upper() for prefix in RUNTIME.config.ado_configs.keys())
         )
-        value = read_jira_issue_key_or_function_key(
+        value = read_console_input_or_function_key(
             f"Jira issue key ({valid_prefixes}; F1 README; F2 add organization; F3 changelog): "
         )
         if value.upper() == "F1":
@@ -280,6 +283,8 @@ def get_jira_issue_key():
             continue
         if value.upper() == "F3":
             view_changelog()
+            continue
+        if value.upper() == "F4":
             continue
         if not value:
             print("A Jira issue key is required.")
@@ -308,34 +313,42 @@ def prompt_for_configuration():
     print("This will create a local config file and save it next to this script.")
     print("Your PATs and Jira token will stay in Windows environment variables.")
 
-    while True:
-        try:
-            org_count = int(
-                get_required_input(
-                    "How many Azure DevOps organizations do you want to configure? "
-                )
-            )
-            if org_count <= 0:
-                raise ValueError("Organization count must be at least 1.")
-            break
-        except ValueError:
-            print("Please enter a whole number greater than 0.")
-
     ado_configs = {}
-    for index in range(1, org_count + 1):
+    while True:
         while True:
-            prefix = get_required_input(
-                f"Organization {index} Jira prefix (for example MBSD): "
+            prefix = read_console_input_or_function_key(
+                "Azure DevOps Jira project-key prefix "
+                "(for example MBSD; F4 to save and continue): "
             ).strip().upper()
-            if prefix:
-                break
+            if prefix == "F4":
+                if ado_configs:
+                    break
+                print("Configure at least one organization before continuing.")
+                continue
+            if not re.fullmatch(r"[A-Z][A-Z0-9]*", prefix):
+                print("Use letters and numbers, starting with a letter.")
+                continue
+            if prefix in ado_configs:
+                print(f"The prefix {prefix} is already configured.")
+                continue
+            break
+        if prefix == "F4":
+            break
+
         while True:
             organization_url = get_required_input(
-                f"Organization {index} Azure DevOps URL (for example https://dev.azure.com/your-org): "
-            )
-            if organization_url:
+                "Azure DevOps organization URL "
+                "(for example https://dev.azure.com/your-org): "
+            ).rstrip("/")
+            parsed_url = urlparse(organization_url)
+            if parsed_url.scheme in {"http", "https"} and parsed_url.netloc:
                 break
+            print("Enter a valid URL beginning with http:// or https://.")
         ado_configs[prefix] = {"organization_url": organization_url}
+        print(
+            f"Added {prefix}. Enter another organization or press F4 "
+            "to save and continue."
+        )
 
     jira_base_url = get_required_input(
         "Jira base URL (for example https://your-company.atlassian.net): "

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
   <title id="title">Sync preflight and summary, version 1.1.0</title>
-  <desc id="desc">Sanitized current preflight lists planned work and requires typing YES before applying the sync.</desc>
+  <desc id="desc">Sanitized current workflow displays the Jira summary and preflight before asking whether to post the planned updates.</desc>
   <rect width="1600" height="1120" fill="#111820"/>
   <rect x="22" y="22" width="1556" height="1076" rx="8" fill="#171f29" stroke="#354252" stroke-width="2"/>
   <rect x="22" y="22" width="1556" height="56" rx="8" fill="#202b37"/>
@@ -10,10 +10,10 @@
   <text x="800" y="57" text-anchor="middle" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="18">Azure DevOps to Jira Sync</text>
   <g font-family="Consolas, 'Courier New', monospace" font-size="18" xml:space="preserve">
     <text x="54" y="116" fill="#79d99a" font-size="21" font-weight="700">PS C:\ADO-to-Jira&gt; Sync preflight - Version 1.1.0</text>
-    <text x="54" y="153" fill="#f2f5f7">ADO work item matching:</text>
-    <text x="54" y="181" fill="#aab7c5">Jira title/summary: DEMO-1234 - Registration request 1001</text>
+    <text x="54" y="153" fill="#f2f5f7">Jira title/summary loaded automatically:</text>
+    <text x="54" y="181" fill="#aab7c5">DEMO-1234 - Registration request 1001</text>
     <text x="54" y="209" fill="#aab7c5">Selected ADO work item ID: 1001</text>
-    <text x="54" y="237" fill="#aab7c5">Show detailed retrieval logs? (y/n): n</text>
+    <text x="54" y="237" fill="#aab7c5">Detailed retrieval logs and preflight are shown automatically.</text>
     <text x="54" y="282" fill="#79d99a" font-size="20" font-weight="700">Sync preflight</text>
     <text x="54" y="312" fill="#f2f5f7">Run ID: 7b43f1a98638460ea60e54fa983281dd</text>
     <text x="54" y="340" fill="#f2f5f7">Jira issue: DEMO-1234</text>
@@ -30,7 +30,7 @@
     <text x="74" y="689" fill="#f2f5f7">System.Description: Existing requirements -&gt; Updated requirements</text>
     <text x="54" y="727" fill="#79d99a">- registration-guide.pdf: 2.4 MB; will be uploaded;</text>
     <text x="74" y="755" fill="#79d99a">source https://dev.azure.com/example-org/attachments/1001/file</text>
-    <text x="54" y="803" fill="#79d99a" font-size="20" font-weight="700">Type YES to apply this sync to DEMO-1234: YES</text>
+    <text x="54" y="803" fill="#79d99a" font-size="20" font-weight="700">Post the planned updates to Jira issue DEMO-1234? (y/n): y</text>
     <text x="54" y="850" fill="#79d99a" font-size="20" font-weight="700">Sync summary</text>
     <text x="54" y="880" fill="#f2f5f7">Run ID: 7b43f1a98638460ea60e54fa983281dd | Jira issue: DEMO-1234</text>
     <text x="54" y="910" fill="#f2f5f7">Comments posted or reconciled: 1 | Comments skipped as duplicates: 2</text>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
   <title id="title">Azure DevOps to Jira Sync first-run setup</title>
-  <desc id="desc">Sanitized terminal capture showing initial configuration for two Azure DevOps organizations and a Jira account.</desc>
+  <desc id="desc">Sanitized terminal capture showing organization details entered one at a time, with F4 to continue to Jira settings.</desc>
   <rect width="1400" height="820" fill="#111820"/>
   <rect x="24" y="24" width="1352" height="772" rx="8" fill="#171f29" stroke="#354252" stroke-width="2"/>
   <rect x="24" y="24" width="1352" height="58" rx="8" fill="#202b37"/>
@@ -8,28 +8,28 @@
   <circle cx="80" cy="53" r="7" fill="#f4bd50"/>
   <circle cx="106" cy="53" r="7" fill="#60c689"/>
   <text x="700" y="60" text-anchor="middle" fill="#aab7c5" font-family="Consolas, 'Courier New', monospace" font-size="18">Azure DevOps to Jira Sync</text>
-  <g font-family="Consolas, 'Courier New', monospace" font-size="22" xml:space="preserve">
+  <g font-family="Consolas, 'Courier New', monospace" font-size="20" xml:space="preserve">
     <text x="64" y="128" fill="#79d99a" font-size="24" font-weight="700">PS C:\ADO-to-Jira&gt; First-run setup</text>
-    <text x="64" y="190" fill="#f2f5f7">Azure DevOps to Jira Sync</text>
-    <text x="64" y="228" fill="#f2f5f7">Initial setup is required.</text>
-    <text x="64" y="266" fill="#f2f5f7">This will create a local config file and save it next to this script.</text>
-    <text x="64" y="304" fill="#f2f5f7">Your PATs and Jira token will stay in Windows environment variables.</text>
-    <text x="64" y="380" fill="#aab7c5">How many Azure DevOps organizations do you want to configure?</text>
-    <text x="815" y="380" fill="#79d99a">2</text>
-    <text x="64" y="418" fill="#aab7c5">Organization 1 Jira prefix (for example MBSD):</text>
-    <text x="625" y="418" fill="#79d99a">DEMO</text>
-    <text x="64" y="456" fill="#aab7c5">Organization 1 Azure DevOps URL:</text>
-    <text x="480" y="456" fill="#79d99a">https://dev.azure.com/example-org</text>
-    <text x="64" y="494" fill="#aab7c5">Organization 2 Jira prefix (for example MBSD):</text>
-    <text x="625" y="494" fill="#79d99a">TEST</text>
-    <text x="64" y="532" fill="#aab7c5">Organization 2 Azure DevOps URL:</text>
-    <text x="480" y="532" fill="#79d99a">https://dev.azure.com/test-org</text>
-    <text x="64" y="594" fill="#aab7c5">Jira base URL:</text>
-    <text x="270" y="594" fill="#79d99a">https://example.atlassian.net</text>
-    <text x="64" y="632" fill="#aab7c5">Jira email address:</text>
-    <text x="310" y="632" fill="#79d99a">user@example.com</text>
-    <text x="64" y="690" fill="#aab7c5">Configuration saved to:</text>
-    <text x="370" y="690" fill="#79d99a">...\config.json</text>
+    <text x="64" y="180" fill="#f2f5f7">Initial setup is required.</text>
+    <text x="64" y="212" fill="#f2f5f7">Your PATs and Jira token stay in Windows environment variables.</text>
+    <text x="64" y="276" fill="#aab7c5">Azure DevOps Jira project-key prefix (for example MBSD; F4 to save and continue):</text>
+    <text x="64" y="308" fill="#79d99a">DEMO</text>
+    <text x="64" y="344" fill="#aab7c5">Azure DevOps organization URL:</text>
+    <text x="390" y="344" fill="#79d99a">https://dev.azure.com/example-org</text>
+    <text x="64" y="390" fill="#aab7c5">Added DEMO. Enter another organization or press F4 to save and continue.</text>
+    <text x="64" y="436" fill="#aab7c5">Azure DevOps Jira project-key prefix (for example MBSD; F4 to save and continue):</text>
+    <text x="64" y="468" fill="#79d99a">TEST</text>
+    <text x="64" y="504" fill="#aab7c5">Azure DevOps organization URL:</text>
+    <text x="390" y="504" fill="#79d99a">https://dev.azure.com/test-org</text>
+    <text x="64" y="550" fill="#aab7c5">Added TEST. Enter another organization or press F4 to save and continue.</text>
+    <text x="64" y="596" fill="#aab7c5">Azure DevOps Jira project-key prefix (for example MBSD; F4 to save and continue):</text>
+    <text x="64" y="628" fill="#79d99a">F4</text>
+    <text x="64" y="674" fill="#aab7c5">Jira base URL:</text>
+    <text x="270" y="674" fill="#79d99a">https://example.atlassian.net</text>
+    <text x="64" y="710" fill="#aab7c5">Jira email address:</text>
+    <text x="310" y="710" fill="#79d99a">user@example.com</text>
+    <text x="64" y="750" fill="#aab7c5">Configuration saved to:</text>
+    <text x="370" y="750" fill="#79d99a">...\config.json</text>
   </g>
   <text x="64" y="754" fill="#728293" font-family="Consolas, 'Courier New', monospace" font-size="16" letter-spacing="1">SANITIZED EXAMPLE | NO REAL CREDENTIALS OR ORGANIZATION DATA</text>
 </svg>

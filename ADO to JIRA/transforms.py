@@ -1,9 +1,11 @@
 import json
+import mimetypes
 import os
 import re
 from datetime import datetime, timezone
+from email.message import Message
 from html.parser import HTMLParser
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 
 class CommentTextParser(HTMLParser):
@@ -79,17 +81,51 @@ def get_comment_attachment_urls(comment_text, organization_url):
     return attachments
 
 
-def get_attachment_filename(attachment):
-    if attachment.get("name"):
-        return attachment["name"]
-    filename = unquote(os.path.basename(urlparse(attachment["url"]).path))
-    if re.fullmatch(
-        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-        filename,
-        re.IGNORECASE,
-    ):
-        return "attachment.bin"
-    return filename or "attachment.bin"
+def get_attachment_filename(
+    attachment, content_disposition=None, content_type=None
+):
+    candidates = []
+    if content_disposition:
+        disposition = Message()
+        disposition["Content-Disposition"] = content_disposition
+        candidates.append(disposition.get_filename())
+
+    query = parse_qs(urlparse(attachment["url"]).query)
+    for key, values in query.items():
+        if key.casefold() == "filename" and values:
+            candidates.append(values[0])
+
+    name = attachment.get("name")
+    if name and name.strip().casefold() not in {"image", "attachment"}:
+        candidates.append(name)
+
+    candidates.append(unquote(os.path.basename(urlparse(attachment["url"]).path)))
+    filename = ""
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate = os.path.basename(str(candidate).replace("\\", "/").strip())
+        if not candidate or candidate.casefold() in {"image", "attachment"}:
+            continue
+        if re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            candidate,
+            re.IGNORECASE,
+        ):
+            continue
+        filename = candidate
+        break
+
+    extension = None
+    if content_type:
+        media_type = content_type.split(";", 1)[0].strip().lower()
+        if media_type != "application/octet-stream":
+            extension = mimetypes.guess_extension(media_type)
+    if not filename:
+        return f"attachment{extension or '.bin'}"
+    if not os.path.splitext(filename)[1] and extension:
+        return filename + extension
+    return filename
 
 
 def format_ado_timestamp(timestamp):
@@ -182,6 +218,11 @@ def get_jira_comment_text(body):
     if isinstance(body, list):
         return "".join(get_jira_comment_text(value) for value in body)
     return ""
+
+
+def jira_comment_matching_text(header, body):
+    title, separator, details = header.partition("\n")
+    return title + (details if separator else "") + body
 
 
 def comment_fingerprint(comment):

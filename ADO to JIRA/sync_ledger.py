@@ -68,6 +68,32 @@ class SyncLedger:
         event["details"] = json.loads(event.pop("details_json"))
         return event
 
+    def get_comment_events_with_missing_targets(
+        self, source_org, work_item_id, jira_issue_key, existing_target_ids
+    ):
+        rows = self.connection.execute(
+            """
+            SELECT event_type, source_id, status, target_id, details_json
+            FROM sync_events
+            WHERE source_org = ? AND work_item_id = ? AND jira_issue_key = ?
+              AND event_type IN ('fields', 'state')
+              AND status IN ('posted', 'reconciled', 'existing')
+            """,
+            (source_org, str(work_item_id), jira_issue_key),
+        ).fetchall()
+        existing_target_ids = {str(target_id) for target_id in existing_target_ids}
+        missing_events = []
+        for row in rows:
+            event = dict(row)
+            if (
+                event["target_id"]
+                and str(event["target_id"]) in existing_target_ids
+            ):
+                continue
+            event["details"] = json.loads(event.pop("details_json"))
+            missing_events.append(event)
+        return missing_events
+
     def complete_event(
         self,
         source_org,

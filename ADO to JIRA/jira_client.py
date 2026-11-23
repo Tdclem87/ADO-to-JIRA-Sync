@@ -1,3 +1,4 @@
+import json
 import tempfile
 import time
 from pathlib import Path
@@ -7,6 +8,40 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from models import RUNTIME
 from transforms import get_attachment_filename, get_jira_comment_text, jira_text_nodes
+
+
+def _jira_comment_error_details(response):
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    if isinstance(payload, dict):
+        details = {
+            key: payload[key]
+            for key in ("errorMessages", "errors")
+            if key in payload
+        }
+        if details:
+            return json.dumps(details, ensure_ascii=False, sort_keys=True)[:1500]
+
+    response_text = getattr(response, "text", "")
+    if isinstance(response_text, str):
+        return " ".join(response_text.split())[:1500]
+    return ""
+
+
+def _raise_for_jira_comment_response(response):
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as error:
+        details = _jira_comment_error_details(response)
+        if not details:
+            raise
+        raise requests.HTTPError(
+            f"{error}; Jira response details: {details}",
+            response=response,
+        ) from error
 
 
 def _post_with_rate_limit_retry(url, data_factory=None, **kwargs):
@@ -139,6 +174,14 @@ def upload_jira_attachment(
             timeout=30,
         ) as response:
             response.raise_for_status()
+            content_type = response.headers.get(
+                "Content-Type", "application/octet-stream"
+            )
+            filename = get_attachment_filename(
+                attachment,
+                content_disposition=response.headers.get("Content-Disposition"),
+                content_type=content_type,
+            )
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > config.max_attachment_bytes:
                 message = (
@@ -164,10 +207,6 @@ def upload_jira_attachment(
                             "url": attachment["url"],
                         }
                     temporary_file.write(chunk)
-            content_type = response.headers.get(
-                "Content-Type", "application/octet-stream"
-            )
-
         with open(temporary_path, "rb") as attachment_file:
             for attempt in range(4):
                 def create_encoder():
@@ -244,30 +283,55 @@ def add_jira_comment(
     comment_body,
     attachment_links,
     jira_api_token,
+    sync_marker=None,
 ):
     config = RUNTIME.config
-    content = [
-        {"type": "paragraph", "content": jira_text_nodes(comment_header)}
-    ]
+    header_title, separator, header_details = comment_header.partition("\n")
+    content = []
+    if header_title:
+        content.append(
+            {
+                "type": "heading",
+                "attrs": {"level": 3},
+                "content": jira_text_nodes(header_title),
+            }
+        )
+    if separator and header_details:
+        content.append(
+            {"type": "paragraph", "content": jira_text_nodes(header_details)}
+        )
     if comment_body:
         content.append(
             {
                 "type": "paragraph",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": comment_body,
-                        "marks": [{"type": "strong"}],
-                    }
-                ],
+                "content": jira_text_nodes(comment_body),
             }
         )
     if attachment_links:
         content.append(
             {
-                "type": "paragraph",
+                "type": "heading",
+                "attrs": {"level": 4},
                 "content": [{"type": "text", "text": "Attachments:"}],
             }
+        )
+    if sync_marker:
+        content.append(
+        {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Sync reference: {sync_marker.strip('[]')}",
+                    "marks": [
+                        {
+                            "type": "textColor",
+                            "attrs": {"color": "#6B778C"},
+                        }
+                    ],
+                }
+            ],
+        }
         )
         for attachment in attachment_links:
             content.append(
@@ -299,7 +363,7 @@ def add_jira_comment(
         },
         timeout=30,
     )
-    response.raise_for_status()
+    _raise_for_jira_comment_response(response)
     return response.json()
 
 

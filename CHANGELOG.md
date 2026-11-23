@@ -2,6 +2,19 @@
 
 Notable user-visible changes are recorded here for each release.
 
+## [Unreleased]
+
+### Changed
+
+- Windows launchers create a local Python environment, check for pip updates, and install requirements automatically.
+- First-run setup collects organization prefixes and URLs until `F4` is pressed instead of asking for an organization count.
+- Jira issue summaries and ADO work-item matches display automatically, followed by the preflight and a clear post-to-Jira confirmation.
+- Generated Jira comments use clear headings, regular-weight details, and a muted sync-reference footer; older bracketed markers remain supported.
+- Attachment uploads preserve original ADO filenames when available and infer missing extensions from the response content type.
+- Sync rechecks recorded Jira comment IDs and restores deleted field or status comments when their ADO revision snapshot is available; missing ADO comments are reimported from ADO.
+- Jira comment failures now include Jira's validation details in the run log and audit export.
+- Jira sync-reference footers use the ADF `textColor` mark, avoiding Jira `INVALID_INPUT` errors when posting comments.
+
 ## [1.1.0] - 2026-10-09
 
 ### Added
